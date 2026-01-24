@@ -40,9 +40,22 @@ flowchart TD
 
 4. Click "Open Preview in New Tab" to export as PDF via browser print
 
-## Tech Stack
+## Dependencies
 
-- React 19 + TypeScript
-- Vite
-- react-markdown + remark-gfm
-- Mermaid
+| Package | Purpose |
+|---------|---------|
+| **react** | UI framework for building the component-based interface |
+| **react-dom** | React renderer for web browsers |
+| **react-markdown** | Converts Markdown strings into React components |
+| **remark-gfm** | Plugin for react-markdown that adds GitHub Flavored Markdown support (tables, strikethrough, task lists, etc.) |
+| **rehype-raw** | Plugin that allows raw HTML embedded in Markdown to pass through |
+| **mermaid** | Renders diagram definitions (flowcharts, sequence diagrams, etc.) into SVG |
+
+### Dev Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| **vite** | Fast build tool and dev server with HMR |
+| **typescript** | Type checking for JavaScript |
+| **@vitejs/plugin-react** | Vite plugin for React Fast Refresh |
+| **eslint** | Code linting |
