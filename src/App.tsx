@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import './App.css';
+
+const STORAGE_KEY = 'md-mermaid-content';
 
 const defaultMarkdown = `# Markdown with Mermaid Demo
 
@@ -70,12 +72,41 @@ classDiagram
 `;
 
 function App() {
-  const [markdown, setMarkdown] = useState(defaultMarkdown);
+  const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
+
+  const [markdown, setMarkdown] = useState(() => {
+    if (isPreviewMode) {
+      return localStorage.getItem(STORAGE_KEY) || defaultMarkdown;
+    }
+    return defaultMarkdown;
+  });
+
+  useEffect(() => {
+    if (!isPreviewMode) {
+      localStorage.setItem(STORAGE_KEY, markdown);
+    }
+  }, [markdown, isPreviewMode]);
+
+  const openPreviewTab = () => {
+    localStorage.setItem(STORAGE_KEY, markdown);
+    window.open(`${window.location.origin}${window.location.pathname}?preview=true`, '_blank');
+  };
+
+  if (isPreviewMode) {
+    return (
+      <div className="preview-only">
+        <MarkdownRenderer content={markdown} />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       <header className="header">
         <h1>Markdown + Mermaid Renderer</h1>
+        <button className="open-preview-btn" onClick={openPreviewTab}>
+          Open Preview in New Tab
+        </button>
       </header>
       <main className="main">
         <div className="editor-pane">
