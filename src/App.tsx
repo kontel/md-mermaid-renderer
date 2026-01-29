@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
+import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
+import type { MermaidRenderMode } from './context/MermaidContext';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -71,7 +73,26 @@ classDiagram
 \`\`\`
 `;
 
-function App() {
+function RenderModeSelector() {
+  const { renderMode, setRenderMode } = useMermaidContext();
+
+  return (
+    <div className="render-mode-selector">
+      <label htmlFor="render-mode">Mermaid Renderer:</label>
+      <select
+        id="render-mode"
+        value={renderMode}
+        onChange={(e) => setRenderMode(e.target.value as MermaidRenderMode)}
+      >
+        <option value="default">Default (mermaid.js)</option>
+        <option value="beautiful-svg">Beautiful Mermaid (SVG)</option>
+        <option value="beautiful-ascii">Beautiful Mermaid (ASCII)</option>
+      </select>
+    </div>
+  );
+}
+
+function AppContent() {
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
 
   const [markdown, setMarkdown] = useState(() => {
@@ -104,9 +125,12 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>Markdown + Mermaid Renderer</h1>
-        <button className="open-preview-btn" onClick={openPreviewTab}>
-          Open Preview in New Tab
-        </button>
+        <div className="header-controls">
+          <RenderModeSelector />
+          <button className="open-preview-btn" onClick={openPreviewTab}>
+            Open Preview in New Tab
+          </button>
+        </div>
       </header>
       <main className="main">
         <div className="editor-pane">
@@ -127,6 +151,14 @@ function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <MermaidProvider>
+      <AppContent />
+    </MermaidProvider>
   );
 }
 
