@@ -6,8 +6,13 @@ A React SPA for rendering Markdown with inline Mermaid diagram support. Features
 
 - GitHub Flavored Markdown (GFM) support
 - Inline Mermaid diagram rendering
+- Multiple rendering options via [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid):
+  - Default (mermaid.js) - standard SVG rendering
+  - Beautiful Mermaid SVG - styled SVG output
+  - Beautiful Mermaid ASCII - terminal-friendly text output
 - Live preview with split-pane editor
 - Open preview in separate tab for PDF export
+- Render mode persisted to localStorage
 - Print-friendly styling
 
 ## Getting Started
@@ -38,7 +43,8 @@ flowchart TD
 ```
 ````
 
-4. Click "Open Preview in New Tab" to export as PDF via browser print
+4. Select a rendering mode from the "Mermaid Renderer" dropdown in the header
+5. Click "Open Preview in New Tab" to export as PDF via browser print
 
 ## Dependencies
 
@@ -50,6 +56,7 @@ flowchart TD
 | **remark-gfm** | Plugin for react-markdown that adds GitHub Flavored Markdown support (tables, strikethrough, task lists, etc.) |
 | **rehype-raw** | Plugin that allows raw HTML embedded in Markdown to pass through |
 | **mermaid** | Renders diagram definitions (flowcharts, sequence diagrams, etc.) into SVG |
+| **beautiful-mermaid** | Alternative mermaid renderer with SVG and ASCII output options |
 
 ### Dev Dependencies
 
