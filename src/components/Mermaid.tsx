@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { renderMermaid, renderMermaidAscii } from 'beautiful-mermaid';
 import { useMermaidContext } from '../context/MermaidContext';
+import type { ThemeConfig } from '../context/MermaidContext';
 
 interface MermaidProps {
   chart: string;
@@ -15,8 +16,25 @@ mermaid.initialize({
 
 let mermaidId = 0;
 
+function buildThemeOptions(config: ThemeConfig) {
+  const options: Record<string, string | boolean | undefined> = {
+    bg: config.bg,
+    fg: config.fg,
+  };
+
+  if (config.line) options.line = config.line;
+  if (config.accent) options.accent = config.accent;
+  if (config.muted) options.muted = config.muted;
+  if (config.surface) options.surface = config.surface;
+  if (config.border) options.border = config.border;
+  if (config.font) options.font = config.font;
+  if (config.transparent) options.transparent = config.transparent;
+
+  return options;
+}
+
 export function Mermaid({ chart }: MermaidProps) {
-  const { renderMode } = useMermaidContext();
+  const { renderMode, themeConfig } = useMermaidContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>('');
   const [ascii, setAscii] = useState<string>('');
@@ -39,12 +57,14 @@ export function Mermaid({ chart }: MermaidProps) {
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-svg') {
-          const svgResult = await renderMermaid(chart);
+          const themeOptions = buildThemeOptions(themeConfig);
+          const svgResult = await renderMermaid(chart, themeOptions);
           setSvg(svgResult);
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-ascii') {
-          const asciiResult = renderMermaidAscii(chart);
+          const themeOptions = buildThemeOptions(themeConfig);
+          const asciiResult = renderMermaidAscii(chart, themeOptions);
           setAscii(asciiResult);
           setSvg('');
           setError(null);
@@ -57,7 +77,7 @@ export function Mermaid({ chart }: MermaidProps) {
     };
 
     renderChart();
-  }, [chart, renderMode]);
+  }, [chart, renderMode, themeConfig]);
 
   if (error) {
     return (

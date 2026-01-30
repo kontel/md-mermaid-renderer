@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
+import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import './App.css';
@@ -92,6 +93,20 @@ function RenderModeSelector() {
   );
 }
 
+function ThemeButton() {
+  const { setDrawerOpen } = useMermaidContext();
+
+  return (
+    <button
+      className="theme-btn-trigger"
+      onClick={() => setDrawerOpen(true)}
+      title="Theme Customization"
+    >
+      Theme
+    </button>
+  );
+}
+
 function AppContent() {
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
 
@@ -127,6 +142,7 @@ function AppContent() {
         <h1>Markdown + Mermaid Renderer</h1>
         <div className="header-controls">
           <RenderModeSelector />
+          <ThemeButton />
           <button className="open-preview-btn" onClick={openPreviewTab}>
             Open Preview in New Tab
           </button>
@@ -150,6 +166,7 @@ function AppContent() {
           </div>
         </div>
       </main>
+      <ThemeDrawer />
     </div>
   );
 }
