@@ -243,6 +243,61 @@ async function convertContainer(
 }
 
 // ---------------------------------------------------------------------------
+// Single-diagram helpers (used by Mermaid component toolbar)
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a diagram container element to a PNG data URI.
+ * Tries SVG pipeline first, falls back to DOM capture.
+ */
+export async function diagramToPngDataUri(container: HTMLElement): Promise<string> {
+  const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
+
+  if (svgEl) {
+    try {
+      return await svgToPngDataUri(svgEl);
+    } catch {
+      // SVG pipeline failed — fall through to DOM capture
+    }
+  }
+
+  return await domToPngDataUri(container);
+}
+
+/** Convert a PNG data URI to a Blob. */
+function dataUriToBlob(dataUri: string): Blob {
+  const [header, base64] = dataUri.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/** Copy a single diagram container as a PNG image to the clipboard. */
+export async function copyDiagramToClipboard(container: HTMLElement): Promise<void> {
+  const dataUri = await diagramToPngDataUri(container);
+  const blob = dataUriToBlob(dataUri);
+  await navigator.clipboard.write([
+    new ClipboardItem({ 'image/png': blob }),
+  ]);
+}
+
+/** Save a single diagram container as a PNG file download. */
+export async function saveDiagramAsFile(container: HTMLElement, filename = 'diagram.png'): Promise<void> {
+  const dataUri = await diagramToPngDataUri(container);
+  const blob = dataUriToBlob(dataUri);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 

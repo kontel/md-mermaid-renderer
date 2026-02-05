@@ -106,6 +106,10 @@
   .code-block {
     break-inside: avoid;
   }
+
+  .diagram-toolbar {
+    display: none;
+  }
 }
 
 .main {
@@ -348,10 +352,19 @@
 }
 
 /* Mermaid styles */
+.mermaid-wrapper {
+  position: relative;
+  margin: 1.5em 0;
+}
+
+.mermaid-wrapper:hover .diagram-toolbar,
+.mermaid-wrapper:focus-within .diagram-toolbar {
+  opacity: 1;
+}
+
 .mermaid-container {
   display: flex;
   justify-content: center;
-  margin: 1.5em 0;
   padding: 1em;
   background-color: #fff;
   border: 1px solid #e1e4e8;
@@ -375,7 +388,7 @@
 
 .mermaid-ascii {
   display: block;
-  margin: 1.5em 0;
+  margin: 0;
   padding: 1em;
   background-color: #1a1a2e;
   color: #eaeaea;
@@ -386,6 +399,50 @@
   line-height: 1.4;
   overflow-x: auto;
   white-space: pre;
+}
+
+/* Diagram toolbar (copy / save icons) */
+.diagram-toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.diagram-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #57606a;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.diagram-toolbar-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #0366d6;
+  color: #0366d6;
+}
+
+.diagram-toolbar-btn--done {
+  background-color: #dafbe1;
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.diagram-toolbar-btn--failed {
+  background-color: #ffeef0;
+  border-color: #cb2431;
+  color: #cb2431;
 }
 
 /* Theme Button Trigger */
