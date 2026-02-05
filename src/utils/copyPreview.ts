@@ -1,3 +1,10 @@
+import html2canvas from 'html2canvas';
+
+export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
+
+/** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
+const MAX_PNG_WIDTH = 600;
+
 const INLINE_STYLES: Record<string, Record<string, string>> = {
   '.markdown-body': {
     color: '#24292e',
@@ -68,84 +75,180 @@ function applyInlineStyles(root: HTMLElement) {
     }
   }
 
-  // Inline striped table rows
   root.querySelectorAll<HTMLElement>('tr:nth-child(even)').forEach((tr) => {
     tr.style.backgroundColor = '#f6f8fa';
   });
 }
 
-async function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
+// ---------------------------------------------------------------------------
+// Strategy 1: SVG → Image → Canvas (fast, but foreignObject causes taint)
+// ---------------------------------------------------------------------------
+
+function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(svgEl);
 
-  // Ensure the SVG has explicit dimensions for the canvas
   const bbox = svgEl.getBoundingClientRect();
-  const width = bbox.width || svgEl.viewBox?.baseVal?.width || 800;
-  const height = bbox.height || svgEl.viewBox?.baseVal?.height || 600;
+  let width = bbox.width || svgEl.viewBox?.baseVal?.width || 800;
+  let height = bbox.height || svgEl.viewBox?.baseVal?.height || 600;
 
-  // Add xmlns if missing
+  // Clamp to max width, scaling height proportionally
+  if (width > MAX_PNG_WIDTH) {
+    height = height * (MAX_PNG_WIDTH / width);
+    width = MAX_PNG_WIDTH;
+  }
+
   if (!svgString.includes('xmlns=')) {
     svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
   }
 
+  // Replace foreignObject with SVG text to avoid canvas taint.
+  svgString = svgString.replace(
+    /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
+    (_match, attrs: string, inner: string) => {
+      const textContent = inner.replace(/<[^>]*>/g, '').trim();
+      if (!textContent) return '';
+
+      const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const w = parseFloat((/\bwidth="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const h = parseFloat((/\bheight="([^"]*)"/.exec(attrs))?.[1] || '0');
+
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      const fontSize = Math.max(10, Math.min(14, h * 0.45));
+
+      return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="arial, sans-serif" font-size="${fontSize}">${textContent}</text>`;
+    },
+  );
+
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
 
+  return new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(scale, scale);
+        ctx.drawImage(image, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('SVG image load failed'));
+    };
+    image.src = url;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Strategy 2: DOM capture via html2canvas (pixel-perfect, slower)
+// ---------------------------------------------------------------------------
+
+async function domToPngDataUri(el: HTMLElement): Promise<string> {
+  const rect = el.getBoundingClientRect();
+  const elWidth = rect.width || MAX_PNG_WIDTH;
+  // Scale down if the element is wider than the cap
+  const scale = elWidth > MAX_PNG_WIDTH ? (MAX_PNG_WIDTH / elWidth) * 2 : 2;
+
+  const canvas = await html2canvas(el, {
+    backgroundColor: '#ffffff',
+    scale,
+    logging: false,
+    useCORS: true,
+  });
+  return canvas.toDataURL('image/png');
+}
+
+// ---------------------------------------------------------------------------
+// Container conversion — applies the chosen strategy per diagram
+// ---------------------------------------------------------------------------
+
+function replaceContainerWithImg(container: HTMLElement, pngDataUri: string) {
+  const img = document.createElement('img');
+  img.src = pngDataUri;
+  img.style.maxWidth = '100%';
+  img.style.height = 'auto';
+
+  container.innerHTML = '';
+  container.style.display = 'block';
+  container.style.textAlign = 'center';
+  container.style.margin = '1.5em 0';
+  container.style.padding = '1em';
+  container.style.backgroundColor = '#fff';
+  container.style.border = '1px solid #e1e4e8';
+  container.style.borderRadius = '6px';
+  container.appendChild(img);
+}
+
+async function convertContainer(
+  liveContainer: HTMLElement,
+  cloneContainer: HTMLElement,
+  strategy: CopyStrategy,
+) {
+  const liveSvg = liveContainer.querySelector<SVGSVGElement>(':scope > svg');
+
+  if (strategy === 'dom-capture') {
+    const png = await domToPngDataUri(liveContainer);
+    replaceContainerWithImg(cloneContainer, png);
+    return;
+  }
+
+  if (strategy === 'svg-pipeline') {
+    if (!liveSvg) return;
+    const png = await svgToPngDataUri(liveSvg);
+    replaceContainerWithImg(cloneContainer, png);
+    return;
+  }
+
+  // "auto": try SVG pipeline first, fall back to DOM capture
+  if (liveSvg) {
+    try {
+      const png = await svgToPngDataUri(liveSvg);
+      replaceContainerWithImg(cloneContainer, png);
+      return;
+    } catch {
+      // SVG pipeline failed (likely foreignObject taint) — fall through
+    }
+  }
+
   try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = url;
-    });
-
-    const scale = 2; // 2x for retina-quality output
-    const canvas = document.createElement('canvas');
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.scale(scale, scale);
-    ctx.drawImage(img, 0, 0, width, height);
-
-    return canvas.toDataURL('image/png');
-  } finally {
-    URL.revokeObjectURL(url);
+    const png = await domToPngDataUri(liveContainer);
+    replaceContainerWithImg(cloneContainer, png);
+  } catch {
+    // leave as-is on total failure
   }
 }
 
-export async function copyPreview(previewEl: HTMLElement): Promise<void> {
-  // Clone the preview DOM so we can mutate it without affecting the page
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+export async function copyPreview(
+  previewEl: HTMLElement,
+  strategy: CopyStrategy = 'auto',
+): Promise<void> {
   const clone = previewEl.cloneNode(true) as HTMLElement;
 
-  // We need the SVGs from the *live* DOM (clone won't have computed dimensions)
-  // So we convert from live SVGs, then inject PNGs into the clone
-  const liveSvgs = previewEl.querySelectorAll<SVGSVGElement>('.mermaid-container svg');
+  const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
-  for (let i = 0; i < liveSvgs.length && i < cloneContainers.length; i++) {
-    try {
-      const pngDataUri = await svgToPngDataUri(liveSvgs[i]);
-      const img = document.createElement('img');
-      img.src = pngDataUri;
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-
-      const container = cloneContainers[i];
-      container.innerHTML = '';
-      container.style.display = 'block';
-      container.style.textAlign = 'center';
-      container.style.margin = '1.5em 0';
-      container.style.padding = '1em';
-      container.style.backgroundColor = '#fff';
-      container.style.border = '1px solid #e1e4e8';
-      container.style.borderRadius = '6px';
-      container.appendChild(img);
-    } catch {
-      // leave as-is on failure
-    }
+  for (let i = 0; i < liveContainers.length; i++) {
+    await convertContainer(liveContainers[i], cloneContainers[i], strategy);
   }
 
   applyInlineStyles(clone);

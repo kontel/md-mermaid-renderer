@@ -44,21 +44,26 @@ flowchart TD
 ```
 ````
 
-4. Select a rendering mode from the "Mermaid Renderer" dropdown in the header
-5. Click "Copy Preview" in the preview pane header to copy the rendered content (including diagrams as images) to your clipboard, then paste into Outlook, Word, or Confluence
-6. Click "Open Preview in New Tab" to export as PDF via browser print
+4. Select a rendering mode from the "Renderer" dropdown in the header
+5. When using a Beautiful Mermaid mode, click "Theme" to customize diagram colors and fonts
+6. Click "Copy" in the preview pane header to copy the rendered content (including diagrams as images) to your clipboard, then paste into Outlook, Word, or Confluence
+7. Click the `▾` toggle next to Copy to choose a diagram conversion strategy (Auto, SVG, or DOM)
+8. Click "New Tab" to open a standalone preview for PDF export via browser print
 
 ## How Copy Preview Works
 
-Outlook, Word, and Confluence don't render inline SVGs from clipboard HTML, so the copy feature converts Mermaid diagrams to PNG images before writing to the clipboard:
+Outlook, Word, and Confluence don't render inline SVGs from clipboard HTML, so the copy feature converts Mermaid diagrams to PNG images before writing to the clipboard. Three conversion strategies are available:
+
+- **Auto** (default) — tries SVG pipeline first, falls back to DOM capture on failure
+- **SVG (fast)** — serializes SVG to XML, strips `<foreignObject>` elements (replacing with `<text>`), draws onto a `<canvas>`, and exports as PNG. Fast but approximate for flowcharts that use foreignObject for text labels.
+- **DOM (pixel-perfect)** — uses `html2canvas` to render the diagram container directly from the DOM. Slower but captures exactly what you see on screen, including custom themes.
+
+In all strategies:
 
 1. The preview DOM is cloned so the page is never modified
-2. Each live SVG is serialized to XML via `XMLSerializer` and loaded into an `Image` element through a Blob URL
-3. The image is drawn onto a `<canvas>` at 2x resolution (for retina clarity) with a white background fill
-4. The canvas is exported as a PNG data URI (`canvas.toDataURL`)
-5. The SVG in the cloned DOM is replaced with an `<img>` tag using the base64 PNG
-6. Critical CSS (fonts, colors, borders, table styling) is inlined on the cloned elements since clipboard HTML has no stylesheet
-7. The result is written to the clipboard as both `text/html` (for rich paste) and `text/plain` (for plain text editors) using `navigator.clipboard.write()`
+2. Diagrams are converted to PNG at 2x resolution (retina clarity), capped at 600px wide
+3. Critical CSS (fonts, colors, borders, table styling) is inlined since clipboard HTML has no stylesheet
+4. The result is written to the clipboard as both `text/html` (for rich paste) and `text/plain` (for plain text editors) using `navigator.clipboard.write()`
 
 ## Dependencies
 
@@ -71,6 +76,7 @@ Outlook, Word, and Confluence don't render inline SVGs from clipboard HTML, so t
 | **rehype-raw** | Plugin that allows raw HTML embedded in Markdown to pass through |
 | **mermaid** | Renders diagram definitions (flowcharts, sequence diagrams, etc.) into SVG |
 | **beautiful-mermaid** | Alternative mermaid renderer with SVG and ASCII output options |
+| **html2canvas** | Renders DOM elements to canvas for pixel-perfect diagram-to-PNG conversion |
 
 ### Dev Dependencies
 

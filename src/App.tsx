@@ -4,6 +4,7 @@ import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
+import type { CopyStrategy } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -76,45 +77,44 @@ classDiagram
 `;
 
 function RenderModeSelector() {
-  const { renderMode, setRenderMode } = useMermaidContext();
+  const { renderMode, setRenderMode, setDrawerOpen } = useMermaidContext();
+  const isBeautiful = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
 
   return (
     <div className="render-mode-selector">
-      <label htmlFor="render-mode">Mermaid Renderer:</label>
+      <label htmlFor="render-mode">Renderer:</label>
       <select
         id="render-mode"
         value={renderMode}
         onChange={(e) => setRenderMode(e.target.value as MermaidRenderMode)}
+        title="Choose how Mermaid diagrams are rendered"
       >
         <option value="default">Default (mermaid.js)</option>
-        <option value="beautiful-svg">Beautiful Mermaid (SVG)</option>
-        <option value="beautiful-ascii">Beautiful Mermaid (ASCII)</option>
+        <option value="beautiful-svg">Beautiful SVG</option>
+        <option value="beautiful-ascii">Beautiful ASCII</option>
       </select>
+      {isBeautiful && (
+        <button
+          className="theme-btn-trigger"
+          onClick={() => setDrawerOpen(true)}
+          title="Customize diagram colors and fonts"
+        >
+          Theme
+        </button>
+      )}
     </div>
-  );
-}
-
-function ThemeButton() {
-  const { setDrawerOpen } = useMermaidContext();
-
-  return (
-    <button
-      className="theme-btn-trigger"
-      onClick={() => setDrawerOpen(true)}
-      title="Theme Customization"
-    >
-      Theme
-    </button>
   );
 }
 
 function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [strategy, setStrategy] = useState<CopyStrategy>('auto');
+  const [showOptions, setShowOptions] = useState(false);
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
     try {
-      await copyPreview(previewRef.current);
+      await copyPreview(previewRef.current, strategy);
       setStatus('copied');
     } catch {
       setStatus('failed');
@@ -123,14 +123,36 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
   };
 
   return (
-    <button
-      className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
-      onClick={handleCopy}
-    >
-      {status === 'idle' && 'Copy Preview'}
-      {status === 'copied' && 'Copied!'}
-      {status === 'failed' && 'Failed'}
-    </button>
+    <div className="copy-preview-group">
+      <button
+        className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
+        onClick={handleCopy}
+        title="Copy preview as rich HTML with diagrams as images"
+      >
+        {status === 'idle' && 'Copy'}
+        {status === 'copied' && 'Copied!'}
+        {status === 'failed' && 'Failed'}
+      </button>
+      <button
+        className={`copy-options-toggle ${showOptions ? 'copy-options-toggle--active' : ''}`}
+        onClick={() => setShowOptions(!showOptions)}
+        title="Image conversion options"
+      >
+        &#9662;
+      </button>
+      {showOptions && (
+        <select
+          className="copy-strategy-select"
+          value={strategy}
+          onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+          title="How diagrams are converted to images for pasting"
+        >
+          <option value="auto">Auto</option>
+          <option value="svg-pipeline">SVG (fast)</option>
+          <option value="dom-capture">DOM (pixel-perfect)</option>
+        </select>
+      )}
+    </div>
   );
 }
 
@@ -170,9 +192,13 @@ function AppContent() {
         <h1>Markdown + Mermaid Renderer</h1>
         <div className="header-controls">
           <RenderModeSelector />
-          <ThemeButton />
-          <button className="open-preview-btn" onClick={openPreviewTab}>
-            Open Preview in New Tab
+          <div className="header-divider" />
+          <button
+            className="open-preview-btn"
+            onClick={openPreviewTab}
+            title="Open a standalone preview tab for PDF export"
+          >
+            New Tab
           </button>
         </div>
       </header>

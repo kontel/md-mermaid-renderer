@@ -15,6 +15,9 @@ mermaid.initialize({
 });
 
 let mermaidId = 0;
+function nextMermaidId() {
+  return `mermaid-${Date.now()}-${mermaidId++}`;
+}
 
 function buildThemeOptions(config: ThemeConfig) {
   const options: Record<string, string | boolean | undefined> = {
@@ -39,7 +42,6 @@ export function Mermaid({ chart }: MermaidProps) {
   const [svg, setSvg] = useState<string>('');
   const [ascii, setAscii] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const idRef = useRef(`mermaid-${mermaidId++}`);
 
   useEffect(() => {
     const renderChart = async () => {
@@ -52,7 +54,8 @@ export function Mermaid({ chart }: MermaidProps) {
 
       try {
         if (renderMode === 'default') {
-          const { svg } = await mermaid.render(idRef.current, chart);
+          const id = nextMermaidId();
+          const { svg } = await mermaid.render(id, chart);
           setSvg(svg);
           setAscii('');
           setError(null);
