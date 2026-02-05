@@ -12,6 +12,7 @@ A React SPA for rendering Markdown with inline Mermaid diagram support. Features
   - Beautiful Mermaid ASCII - terminal-friendly text output
 - Live preview with split-pane editor
 - Open preview in separate tab for PDF export
+- Copy preview to clipboard for pasting into Outlook, Word, and Confluence (SVG diagrams are converted to PNG images for compatibility)
 - Render mode persisted to localStorage
 - Print-friendly styling
 
@@ -44,7 +45,8 @@ flowchart TD
 ````
 
 4. Select a rendering mode from the "Mermaid Renderer" dropdown in the header
-5. Click "Open Preview in New Tab" to export as PDF via browser print
+5. Click "Copy Preview" in the preview pane header to copy the rendered content (including diagrams as images) to your clipboard, then paste into Outlook, Word, or Confluence
+6. Click "Open Preview in New Tab" to export as PDF via browser print
 
 ## Dependencies
 
