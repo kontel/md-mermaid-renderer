@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
+import { Onboarding } from './components/Onboarding';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
@@ -199,6 +200,7 @@ function AppContent() {
           </button>
         </div>
       </header>
+      <Onboarding />
       <main className="main">
         <div className="editor-pane">
           <label htmlFor="markdown-editor" className="pane-header">Editor</label>

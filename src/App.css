@@ -401,13 +401,13 @@
   white-space: pre;
 }
 
-/* Diagram toolbar (copy / save icons) */
+/* Diagram toolbar (copy / save buttons) */
 .diagram-toolbar {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
   display: flex;
-  gap: 0.25rem;
+  gap: 0.35rem;
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -415,34 +415,54 @@
 .diagram-toolbar-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
   border: 1px solid #d0d7de;
-  border-radius: 4px;
-  background-color: #ffffff;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.95);
   color: #57606a;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .diagram-toolbar-btn:hover {
-  background-color: #f3f4f6;
+  background-color: #ffffff;
   border-color: #0366d6;
   color: #0366d6;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.diagram-toolbar-label {
+  pointer-events: none;
 }
 
 .diagram-toolbar-btn--done {
   background-color: #dafbe1;
-  border-color: #28a745;
-  color: #28a745;
+  border-color: #2da44e;
+  color: #1a7f37;
+}
+
+.diagram-toolbar-btn--done:hover {
+  background-color: #dafbe1;
+  border-color: #2da44e;
+  color: #1a7f37;
 }
 
 .diagram-toolbar-btn--failed {
-  background-color: #ffeef0;
-  border-color: #cb2431;
-  color: #cb2431;
+  background-color: #ffebe9;
+  border-color: #cf222e;
+  color: #cf222e;
+}
+
+.diagram-toolbar-btn--failed:hover {
+  background-color: #ffebe9;
+  border-color: #cf222e;
+  color: #cf222e;
 }
 
 /* Theme Button Trigger */
@@ -721,6 +741,128 @@ button, select {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Onboarding banner */
+.onboarding {
+  background-color: #0f3460;
+  border-bottom: 1px solid #1a4a8a;
+  padding: 0.75rem 1.5rem;
+  animation: onboardingSlideDown 0.25s ease-out;
+}
+
+@keyframes onboardingSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-content {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.onboarding-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-intro {
+  margin: 0;
+  color: #c8d6e5;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.onboarding-close {
+  background: none;
+  border: none;
+  color: #6b7d94;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.onboarding-close:hover {
+  color: #eaeaea;
+}
+
+.onboarding-steps {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-step {
+  flex: 1;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.onboarding-step-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(233, 69, 96, 0.15);
+  color: #e94560;
+  border-radius: 6px;
+}
+
+.onboarding-step-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #eaeaea;
+  margin-bottom: 0.15rem;
+}
+
+.onboarding-step-desc {
+  font-size: 0.72rem;
+  color: #8e9eb5;
+  line-height: 1.4;
+}
+
+.onboarding-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.onboarding-hint {
+  font-size: 0.7rem;
+  color: #6b7d94;
+  font-style: italic;
+}
+
+.onboarding-dismiss-btn {
+  background-color: #e94560;
+  color: white;
+  border: none;
+  padding: 0.35rem 1rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.onboarding-dismiss-btn:hover {
+  background-color: #d63850;
 }
 
 /* Reduced motion */

@@ -37,7 +37,7 @@ function buildThemeOptions(config: ThemeConfig) {
   return options;
 }
 
-// Inline SVG icon components (16x16, no external deps)
+// Inline SVG icon components (no external deps)
 function CopyIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -56,6 +56,22 @@ function SaveIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8.5 6.5 12 13 4" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
+
 type ActionStatus = 'idle' | 'done' | 'failed';
 
 function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLElement | null> }) {
@@ -70,7 +86,7 @@ function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLEl
     } catch {
       setCopyStatus('failed');
     }
-    setTimeout(() => setCopyStatus('idle'), 1500);
+    setTimeout(() => setCopyStatus('idle'), 2000);
   }, [containerRef]);
 
   const handleSave = useCallback(async () => {
@@ -81,8 +97,13 @@ function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLEl
     } catch {
       setSaveStatus('failed');
     }
-    setTimeout(() => setSaveStatus('idle'), 1500);
+    setTimeout(() => setSaveStatus('idle'), 2000);
   }, [containerRef]);
+
+  const copyIcon = copyStatus === 'done' ? <CheckIcon /> : copyStatus === 'failed' ? <XIcon /> : <CopyIcon />;
+  const saveIcon = saveStatus === 'done' ? <CheckIcon /> : saveStatus === 'failed' ? <XIcon /> : <SaveIcon />;
+  const copyLabel = copyStatus === 'done' ? 'Copied' : copyStatus === 'failed' ? 'Failed' : 'Copy';
+  const saveLabel = saveStatus === 'done' ? 'Saved' : saveStatus === 'failed' ? 'Failed' : 'Save';
 
   return (
     <div className="diagram-toolbar">
@@ -92,7 +113,8 @@ function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLEl
         aria-label="Copy diagram to clipboard"
         title="Copy to clipboard"
       >
-        <CopyIcon />
+        {copyIcon}
+        <span className="diagram-toolbar-label">{copyLabel}</span>
       </button>
       <button
         className={`diagram-toolbar-btn ${saveStatus !== 'idle' ? `diagram-toolbar-btn--${saveStatus}` : ''}`}
@@ -100,7 +122,8 @@ function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLEl
         aria-label="Save diagram as PNG"
         title="Save as PNG"
       >
-        <SaveIcon />
+        {saveIcon}
+        <span className="diagram-toolbar-label">{saveLabel}</span>
       </button>
     </div>
   );
