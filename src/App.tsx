@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
+import { copyPreview } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -107,8 +108,35 @@ function ThemeButton() {
   );
 }
 
+function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
+  const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const handleCopy = async () => {
+    if (!previewRef.current) return;
+    try {
+      await copyPreview(previewRef.current);
+      setStatus('copied');
+    } catch {
+      setStatus('failed');
+    }
+    setTimeout(() => setStatus('idle'), 2000);
+  };
+
+  return (
+    <button
+      className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
+      onClick={handleCopy}
+    >
+      {status === 'idle' && 'Copy Preview'}
+      {status === 'copied' && 'Copied!'}
+      {status === 'failed' && 'Failed'}
+    </button>
+  );
+}
+
 function AppContent() {
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const [markdown, setMarkdown] = useState(() => {
     if (isPreviewMode) {
@@ -160,8 +188,11 @@ function AppContent() {
           />
         </div>
         <div className="preview-pane">
-          <div className="pane-header">Preview</div>
-          <div className="preview">
+          <div className="pane-header">
+            Preview
+            <CopyPreviewButton previewRef={previewRef} />
+          </div>
+          <div className="preview" ref={previewRef}>
             <MarkdownRenderer content={markdown} />
           </div>
         </div>

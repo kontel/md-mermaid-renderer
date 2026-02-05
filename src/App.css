@@ -122,6 +122,41 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid #0f3460;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Copy Preview Button */
+.copy-preview-btn {
+  background-color: #0f3460;
+  color: #eaeaea;
+  border: 1px solid #0f3460;
+  padding: 0.25rem 0.65rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: all 0.2s;
+}
+
+.copy-preview-btn:hover {
+  background-color: #16213e;
+  border-color: #e94560;
+}
+
+.copy-preview-btn--copied {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+.copy-preview-btn--failed {
+  background-color: #cb2431;
+  border-color: #cb2431;
+  color: white;
 }
 
 .editor {
