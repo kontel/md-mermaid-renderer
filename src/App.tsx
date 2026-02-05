@@ -10,6 +10,8 @@ import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
 
+const KONTEL_AVATAR_URL = `${import.meta.env.BASE_URL}kontel-avatar.jpg`;
+
 const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
 
 const defaultMarkdown = `# Markdown with Mermaid Demo
@@ -185,7 +187,19 @@ function AppContent() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Markdown + Mermaid</h1>
+        <div className="header-brand">
+          <h1>Markdown + Mermaid</h1>
+          <a
+            href="https://github.com/kontel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-byline"
+            title="kontel on GitHub"
+          >
+            <img src={KONTEL_AVATAR_URL} alt="" className="header-avatar" width={20} height={20} />
+            <span>created by kontel</span>
+          </a>
+        </div>
         <div className="header-controls">
           <RenderModeSelector />
           <div className="header-divider" />

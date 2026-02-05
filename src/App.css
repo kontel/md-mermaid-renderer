@@ -15,11 +15,42 @@
   align-items: center;
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .header h1 {
   margin: 0;
   font-size: 1.25rem;
   color: #e94560;
   white-space: nowrap;
+}
+
+.header-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #8892a0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+
+.header-byline:hover {
+  color: #e94560;
+}
+
+.header-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #0f3460;
+  flex-shrink: 0;
 }
 
 .header-controls {
