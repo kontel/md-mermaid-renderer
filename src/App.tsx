@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
@@ -8,6 +8,8 @@ import type { CopyStrategy } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
+
+const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
 
 const defaultMarkdown = `# Markdown with Mermaid Demo
 
@@ -76,7 +78,7 @@ classDiagram
 \`\`\`
 `;
 
-function RenderModeSelector() {
+const RenderModeSelector = memo(function RenderModeSelector() {
   const { renderMode, setRenderMode, setDrawerOpen } = useMermaidContext();
   const isBeautiful = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
 
@@ -104,12 +106,11 @@ function RenderModeSelector() {
       )}
     </div>
   );
-}
+});
 
-function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
+const CopyPreviewButton = memo(function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
-  const [showOptions, setShowOptions] = useState(false);
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
@@ -122,6 +123,8 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
     setTimeout(() => setStatus('idle'), 2000);
   };
 
+  const statusLabel = status === 'idle' ? 'Copy Preview' : status === 'copied' ? 'Copied!' : 'Failed';
+
   return (
     <div className="copy-preview-group">
       <button
@@ -129,35 +132,27 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
         onClick={handleCopy}
         title="Copy preview as rich HTML with diagrams as images"
       >
-        {status === 'idle' && 'Copy'}
-        {status === 'copied' && 'Copied!'}
-        {status === 'failed' && 'Failed'}
+        {statusLabel}
       </button>
-      <button
-        className={`copy-options-toggle ${showOptions ? 'copy-options-toggle--active' : ''}`}
-        onClick={() => setShowOptions(!showOptions)}
-        title="Image conversion options"
+      <select
+        className="copy-strategy-select"
+        value={strategy}
+        onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+        title="How diagrams are converted to images for pasting"
+        aria-label="Diagram conversion strategy"
       >
-        &#9662;
-      </button>
-      {showOptions && (
-        <select
-          className="copy-strategy-select"
-          value={strategy}
-          onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
-          title="How diagrams are converted to images for pasting"
-        >
-          <option value="auto">Auto</option>
-          <option value="svg-pipeline">SVG (fast)</option>
-          <option value="dom-capture">DOM (pixel-perfect)</option>
-        </select>
-      )}
+        <option value="auto">Auto</option>
+        <option value="svg-pipeline">SVG (fast)</option>
+        <option value="dom-capture">DOM (pixel-perfect)</option>
+      </select>
+      <span aria-live="polite" className="sr-only">
+        {status === 'copied' ? 'Preview copied to clipboard' : status === 'failed' ? 'Copy failed' : ''}
+      </span>
     </div>
   );
-}
+});
 
 function AppContent() {
-  const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
   const previewRef = useRef<HTMLDivElement>(null);
 
   const [markdown, setMarkdown] = useState(() => {
@@ -171,7 +166,7 @@ function AppContent() {
     if (!isPreviewMode) {
       localStorage.setItem(STORAGE_KEY, markdown);
     }
-  }, [markdown, isPreviewMode]);
+  }, [markdown]);
 
   const openPreviewTab = () => {
     localStorage.setItem(STORAGE_KEY, markdown);
@@ -189,23 +184,26 @@ function AppContent() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Markdown + Mermaid Renderer</h1>
+        <h1>Markdown + Mermaid</h1>
         <div className="header-controls">
           <RenderModeSelector />
+          <div className="header-divider" />
+          <CopyPreviewButton previewRef={previewRef} />
           <div className="header-divider" />
           <button
             className="open-preview-btn"
             onClick={openPreviewTab}
             title="Open a standalone preview tab for PDF export"
           >
-            New Tab
+            Open Preview
           </button>
         </div>
       </header>
       <main className="main">
         <div className="editor-pane">
-          <div className="pane-header">Editor</div>
+          <label htmlFor="markdown-editor" className="pane-header">Editor</label>
           <textarea
+            id="markdown-editor"
             className="editor"
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
@@ -214,10 +212,7 @@ function AppContent() {
           />
         </div>
         <div className="preview-pane">
-          <div className="pane-header">
-            Preview
-            <CopyPreviewButton previewRef={previewRef} />
-          </div>
+          <div className="pane-header">Preview</div>
           <div className="preview" ref={previewRef}>
             <MarkdownRenderer content={markdown} />
           </div>

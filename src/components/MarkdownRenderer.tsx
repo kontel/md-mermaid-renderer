@@ -8,47 +8,50 @@ interface MarkdownRendererProps {
   content: string;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  const components: Components = {
-    code({ className, children, ...props }) {
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
-      const codeContent = String(children).replace(/\n$/, '');
+const LANGUAGE_RE = /language-(\w+)/;
 
-      if (language === 'mermaid') {
-        return <Mermaid chart={codeContent} />;
-      }
+const components: Components = {
+  code({ className, children, ...props }) {
+    const match = LANGUAGE_RE.exec(className || '');
+    const language = match ? match[1] : '';
+    const codeContent = String(children).replace(/\n$/, '');
 
-      // Check if this is an inline code block
-      const isInline = !className && !codeContent.includes('\n');
+    if (language === 'mermaid') {
+      return <Mermaid chart={codeContent} />;
+    }
 
-      if (isInline) {
-        return (
-          <code className="inline-code" {...props}>
-            {children}
-          </code>
-        );
-      }
+    const isInline = !className && !codeContent.includes('\n');
 
+    if (isInline) {
       return (
-        <pre className="code-block">
-          <code className={className} {...props}>
-            {children}
-          </code>
-        </pre>
+        <code className="inline-code" {...props}>
+          {children}
+        </code>
       );
-    },
-    pre({ children }) {
-      // Just return children since we handle pre in the code component
-      return <>{children}</>;
-    },
-  };
+    }
 
+    return (
+      <pre className="code-block">
+        <code className={className} {...props}>
+          {children}
+        </code>
+      </pre>
+    );
+  },
+  pre({ children }) {
+    return <>{children}</>;
+  },
+};
+
+const remarkPlugins = [remarkGfm];
+const rehypePlugins = [rehypeRaw];
+
+export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={components}
       >
         {content}

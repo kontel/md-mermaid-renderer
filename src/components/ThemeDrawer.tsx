@@ -1,3 +1,4 @@
+import { useEffect, useRef, useCallback } from 'react';
 import { useMermaidContext, type ThemeConfig, type ThemePreset } from '../context/MermaidContext';
 
 const PRESET_THEME_VALUES: Record<string, { bg: string; fg: string; line?: string; accent?: string; muted?: string; surface?: string; border?: string }> = {
@@ -53,6 +54,8 @@ function generateRandomTheme(): Partial<ThemeConfig> {
   return { bg, fg, line: muted, accent, muted, surface, border };
 }
 
+let colorInputId = 0;
+
 interface ColorInputProps {
   label: string;
   value: string;
@@ -60,16 +63,19 @@ interface ColorInputProps {
 }
 
 function ColorInput({ label, value, onChange }: ColorInputProps) {
+  const id = useRef(`color-input-${colorInputId++}`).current;
   return (
     <div className="theme-color-input">
-      <label>{label}</label>
+      <label htmlFor={id}>{label}</label>
       <div className="color-input-wrapper">
         <input
           type="color"
           value={value || '#000000'}
           onChange={(e) => onChange(e.target.value)}
+          aria-label={`${label} color picker`}
         />
         <input
+          id={id}
           type="text"
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
@@ -80,10 +86,60 @@ function ColorInput({ label, value, onChange }: ColorInputProps) {
   );
 }
 
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function ThemeDrawer() {
   const { themeConfig, setThemeConfig, isDrawerOpen, setDrawerOpen, renderMode } = useMermaidContext();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const isBeautifulMode = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
+
+  const closeDrawer = useCallback(() => setDrawerOpen(false), [setDrawerOpen]);
+
+  // Focus trap and Escape key
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    // Focus first focusable element in drawer
+    const timer = requestAnimationFrame(() => {
+      const firstFocusable = drawerRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      firstFocusable?.focus();
+    });
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeDrawer();
+        return;
+      }
+
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusableEls = drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (focusableEls.length === 0) return;
+
+        const firstEl = focusableEls[0];
+        const lastEl = focusableEls[focusableEls.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl.focus();
+        } else if (!e.shiftKey && document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      cancelAnimationFrame(timer);
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [isDrawerOpen, closeDrawer]);
 
   const handlePresetChange = (preset: ThemePreset) => {
     if (preset === 'custom') {
@@ -125,7 +181,6 @@ export function ThemeDrawer() {
 
   const handleReset = () => {
     if (themeConfig.preset === 'custom') {
-      // Reset to default custom colors
       setThemeConfig({
         preset: 'custom',
         bg: '#1a1b26',
@@ -147,11 +202,21 @@ export function ThemeDrawer() {
 
   return (
     <>
-      <div className="theme-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
-      <div className="theme-drawer">
+      <div className="theme-drawer-backdrop" onClick={closeDrawer} />
+      <div
+        ref={drawerRef}
+        className="theme-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Theme Customization"
+      >
         <div className="theme-drawer-header">
-          <h2>Theme Customization</h2>
-          <button className="theme-drawer-close" onClick={() => setDrawerOpen(false)}>
+          <h2>Theme</h2>
+          <button
+            className="theme-drawer-close"
+            onClick={closeDrawer}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -164,10 +229,11 @@ export function ThemeDrawer() {
 
         <div className="theme-drawer-content">
           <div className="theme-section">
-            <h3>Preset Theme</h3>
+            <h3>Preset</h3>
             <select
               value={themeConfig.preset}
               onChange={(e) => handlePresetChange(e.target.value as ThemePreset)}
+              aria-label="Theme preset"
             >
               <option value="custom">Custom</option>
               <optgroup label="Light Themes">
@@ -234,8 +300,9 @@ export function ThemeDrawer() {
           <div className="theme-section">
             <h3>Typography</h3>
             <div className="theme-font-select">
-              <label>Font Family</label>
+              <label htmlFor="theme-font">Font Family</label>
               <select
+                id="theme-font"
                 value={themeConfig.font || 'Inter'}
                 onChange={(e) => handleFontChange(e.target.value)}
               >

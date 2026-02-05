@@ -3,11 +3,12 @@
   flex-direction: column;
   height: 100vh;
   background-color: #1a1a2e;
+  color: #eaeaea;
 }
 
 .header {
   background-color: #16213e;
-  padding: 1rem 2rem;
+  padding: 0.75rem 1.5rem;
   border-bottom: 1px solid #0f3460;
   display: flex;
   justify-content: space-between;
@@ -16,14 +17,15 @@
 
 .header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: #e94560;
+  white-space: nowrap;
 }
 
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .render-mode-selector {
@@ -55,9 +57,9 @@
   border-color: #e94560;
 }
 
-.render-mode-selector select:focus {
-  outline: none;
-  border-color: #e94560;
+.render-mode-selector select:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
 }
 
 .header-divider {
@@ -68,14 +70,14 @@
 
 .open-preview-btn {
   background-color: transparent;
-  color: #a0a0a0;
+  color: #c0c0c0;
   border: 1px solid #0f3460;
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: border-color 0.2s, color 0.2s;
 }
 
 .open-preview-btn:hover {
@@ -125,10 +127,10 @@
 }
 
 .pane-header {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   background-color: #16213e;
   color: #a0a0a0;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -142,21 +144,21 @@
 .copy-preview-group {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .copy-preview-btn {
   background-color: #0f3460;
   color: #eaeaea;
   border: 1px solid #0f3460;
-  padding: 0.25rem 0.65rem;
-  border-radius: 4px 0 0 4px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: normal;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .copy-preview-btn:hover {
@@ -176,49 +178,25 @@
   color: white;
 }
 
-.copy-options-toggle {
-  background-color: #0f3460;
-  color: #a0a0a0;
-  border: 1px solid #0f3460;
-  border-left: none;
-  padding: 0.25rem 0.3rem;
-  border-radius: 0 4px 4px 0;
-  cursor: pointer;
-  font-size: 0.6rem;
-  line-height: 1;
-  transition: all 0.2s;
-}
-
-.copy-options-toggle:hover {
-  background-color: #16213e;
-  border-color: #e94560;
-  color: #eaeaea;
-}
-
-.copy-options-toggle--active {
-  color: #e94560;
-}
-
 .copy-strategy-select {
   background-color: #1a1a2e;
   color: #a0a0a0;
   border: 1px solid #0f3460;
-  padding: 0.2rem 0.35rem;
+  padding: 0.3rem 0.4rem;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   cursor: pointer;
   text-transform: none;
   letter-spacing: normal;
-  margin-left: 0.25rem;
 }
 
 .copy-strategy-select:hover {
   border-color: #e94560;
 }
 
-.copy-strategy-select:focus {
-  outline: none;
-  border-color: #e94560;
+.copy-strategy-select:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
 }
 
 .editor {
@@ -231,11 +209,15 @@
   font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
   font-size: 0.9rem;
   line-height: 1.6;
-  outline: none;
+}
+
+.editor:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: -2px;
 }
 
 .editor::placeholder {
-  color: #555;
+  color: #6a6a6a;
 }
 
 .preview {
@@ -303,6 +285,12 @@
 
 .markdown-body a:hover {
   text-decoration: underline;
+}
+
+.markdown-body a:focus-visible {
+  outline: 2px solid #0366d6;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .markdown-body blockquote {
@@ -410,7 +398,7 @@
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .theme-btn-trigger:hover {
@@ -442,6 +430,7 @@
   display: flex;
   flex-direction: column;
   animation: slideIn 0.2s ease-out;
+  overscroll-behavior: contain;
 }
 
 @keyframes slideIn {
@@ -473,7 +462,7 @@
   color: #a0a0a0;
   font-size: 1.5rem;
   cursor: pointer;
-  padding: 0;
+  padding: 0.25rem;
   line-height: 1;
 }
 
@@ -524,9 +513,9 @@
   border-color: #e94560;
 }
 
-.theme-section select:focus {
-  outline: none;
-  border-color: #e94560;
+.theme-section select:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
 }
 
 .theme-color-input {
@@ -578,9 +567,9 @@
   font-family: 'Fira Code', monospace;
 }
 
-.color-input-wrapper input[type="text"]:focus {
-  outline: none;
-  border-color: #e94560;
+.color-input-wrapper input[type="text"]:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
 }
 
 .theme-font-select {
@@ -629,7 +618,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .theme-btn-randomize {
@@ -653,6 +642,41 @@
   color: #eaeaea;
 }
 
+/* Global focus-visible for all buttons */
+button:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
+}
+
+/* Touch interactions */
+button, select {
+  touch-action: manipulation;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .header {
@@ -662,7 +686,7 @@
   }
 
   .header h1 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
 
   .header-controls {

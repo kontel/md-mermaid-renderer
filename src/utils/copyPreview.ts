@@ -5,6 +5,14 @@ export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
 /** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
 const MAX_PNG_WIDTH = 600;
 
+// Hoisted regex patterns for SVG processing
+const FOREIGN_OBJECT_RE = /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi;
+const HTML_TAG_RE = /<[^>]*>/g;
+const ATTR_X_RE = /\bx="([^"]*)"/;
+const ATTR_Y_RE = /\by="([^"]*)"/;
+const ATTR_WIDTH_RE = /\bwidth="([^"]*)"/;
+const ATTR_HEIGHT_RE = /\bheight="([^"]*)"/;
+
 const INLINE_STYLES: Record<string, Record<string, string>> = {
   '.markdown-body': {
     color: '#24292e',
@@ -104,15 +112,15 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
 
   // Replace foreignObject with SVG text to avoid canvas taint.
   svgString = svgString.replace(
-    /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
+    FOREIGN_OBJECT_RE,
     (_match, attrs: string, inner: string) => {
-      const textContent = inner.replace(/<[^>]*>/g, '').trim();
+      const textContent = inner.replace(HTML_TAG_RE, '').trim();
       if (!textContent) return '';
 
-      const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const w = parseFloat((/\bwidth="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const h = parseFloat((/\bheight="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const x = parseFloat(ATTR_X_RE.exec(attrs)?.[1] || '0');
+      const y = parseFloat(ATTR_Y_RE.exec(attrs)?.[1] || '0');
+      const w = parseFloat(ATTR_WIDTH_RE.exec(attrs)?.[1] || '0');
+      const h = parseFloat(ATTR_HEIGHT_RE.exec(attrs)?.[1] || '0');
 
       const cx = x + w / 2;
       const cy = y + h / 2;
@@ -247,9 +255,11 @@ export async function copyPreview(
   const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
-  for (let i = 0; i < liveContainers.length; i++) {
-    await convertContainer(liveContainers[i], cloneContainers[i], strategy);
-  }
+  await Promise.all(
+    Array.from(liveContainers).map((live, i) =>
+      convertContainer(live, cloneContainers[i], strategy)
+    )
+  );
 
   applyInlineStyles(clone);
 

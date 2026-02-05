@@ -92,7 +92,7 @@ export function Mermaid({ chart }: MermaidProps) {
 
   if (renderMode === 'beautiful-ascii' && ascii) {
     return (
-      <pre className="mermaid-ascii">
+      <pre className="mermaid-ascii" role="img" aria-label="Mermaid diagram (ASCII)">
         {ascii}
       </pre>
     );
@@ -102,6 +102,8 @@ export function Mermaid({ chart }: MermaidProps) {
     <div
       ref={containerRef}
       className="mermaid-container"
+      role="img"
+      aria-label="Mermaid diagram"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
