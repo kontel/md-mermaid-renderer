@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { renderMermaid, renderMermaidAscii } from 'beautiful-mermaid';
 import { useMermaidContext } from '../context/MermaidContext';
 import type { ThemeConfig } from '../context/MermaidContext';
+import { copyDiagramToClipboard, saveDiagramAsFile } from '../utils/copyPreview';
 
 interface MermaidProps {
   chart: string;
@@ -36,9 +37,48 @@ function buildThemeOptions(config: ThemeConfig) {
   return options;
 }
 
+function DiagramActions({ containerRef }: { containerRef: React.RefObject<HTMLElement | null> }) {
+  const [status, setStatus] = useState<'idle' | 'copied' | 'saved'>('idle');
+
+  const onCopy = useCallback(async () => {
+    if (!containerRef.current) return;
+    try {
+      await copyDiagramToClipboard(containerRef.current);
+      setStatus('copied');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch {
+      setStatus('idle');
+    }
+  }, [containerRef]);
+
+  const onSave = useCallback(async () => {
+    if (!containerRef.current) return;
+    try {
+      await saveDiagramAsFile(containerRef.current);
+      setStatus('saved');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch {
+      setStatus('idle');
+    }
+  }, [containerRef]);
+
+  return (
+    <div className="diagram-actions">
+      <button type="button" className="diagram-actions-btn" onClick={onCopy} title="Copy as PNG">
+        Copy
+      </button>
+      <button type="button" className="diagram-actions-btn" onClick={onSave} title="Save as PNG">
+        Save
+      </button>
+      {status === 'copied' && <span className="diagram-actions-status">Copied!</span>}
+      {status === 'saved' && <span className="diagram-actions-status">Saved!</span>}
+    </div>
+  );
+}
+
 export function Mermaid({ chart }: MermaidProps) {
   const { renderMode, themeConfig } = useMermaidContext();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLElement>(null);
   const [svg, setSvg] = useState<string>('');
   const [ascii, setAscii] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -92,17 +132,23 @@ export function Mermaid({ chart }: MermaidProps) {
 
   if (renderMode === 'beautiful-ascii' && ascii) {
     return (
-      <pre className="mermaid-ascii">
-        {ascii}
-      </pre>
+      <div className="mermaid-block">
+        <pre ref={containerRef as React.RefObject<HTMLPreElement | null>} className="mermaid-ascii">
+          {ascii}
+        </pre>
+        <DiagramActions containerRef={containerRef} />
+      </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="mermaid-container"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <div className="mermaid-block">
+      <div
+        ref={containerRef as React.RefObject<HTMLDivElement | null>}
+        className="mermaid-container"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <DiagramActions containerRef={containerRef} />
+    </div>
   );
 }

@@ -97,6 +97,10 @@
     max-width: none;
   }
 
+  .diagram-actions {
+    display: none;
+  }
+
   .mermaid-container {
     break-inside: avoid;
   }
@@ -359,7 +363,11 @@
   padding: 0;
 }
 
-/* Mermaid styles */
+/* Mermaid styles — .mermaid-block is layout-neutral (no position/margin) so rendering is unchanged */
+.mermaid-block {
+  display: block;
+}
+
 .mermaid-container {
   display: flex;
   justify-content: center;
@@ -373,6 +381,33 @@
 .mermaid-container svg {
   max-width: 100%;
   height: auto;
+}
+
+.diagram-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.diagram-actions-btn {
+  background: #0f3460;
+  color: #eaeaea;
+  border: 1px solid #0f3460;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.diagram-actions-btn:hover {
+  border-color: #e94560;
+}
+
+.diagram-actions-status {
+  color: #28a745;
+  font-size: 0.75rem;
 }
 
 .mermaid-error {
