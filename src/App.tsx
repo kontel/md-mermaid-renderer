@@ -9,6 +9,9 @@ import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
 
+const AVATAR_SRC =
+  import.meta.env.DEV ? '/kontel-avatar.png' : `${import.meta.env.BASE_URL}kontel-avatar.png`;
+
 const defaultMarkdown = `# Markdown with Mermaid Demo
 
 This is a **markdown** renderer with support for *inline* Mermaid diagrams.
@@ -189,7 +192,26 @@ function AppContent() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Markdown + Mermaid Renderer</h1>
+        <div className="header-brand">
+          <h1>Markdown + Mermaid Renderer</h1>
+          <a
+            href="https://github.com/kontel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-byline"
+            title="kontel on GitHub"
+          >
+            <img
+              src={AVATAR_SRC}
+              alt=""
+              className="header-avatar"
+              width={20}
+              height={20}
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+            <span>created by kontel</span>
+          </a>
+        </div>
         <div className="header-controls">
           <RenderModeSelector />
           <div className="header-divider" />

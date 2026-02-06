@@ -5,25 +5,68 @@
   background-color: #1a1a2e;
 }
 
+/* Header only — no changes outside .header to avoid affecting SVG/preview */
 .header {
   background-color: #16213e;
-  padding: 1rem 2rem;
+  padding: 0.75rem 1.25rem;
   border-bottom: 1px solid #0f3460;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
+  font-weight: 600;
   color: #e94560;
+  letter-spacing: -0.02em;
+}
+
+.header-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #8892a0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+
+.header-byline:hover {
+  color: #e94560;
+}
+
+.header-byline:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.header-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #0f3460;
+  flex-shrink: 0;
 }
 
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .render-mode-selector {
@@ -38,16 +81,16 @@
 
 .render-mode-selector label {
   color: #a0a0a0;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .render-mode-selector select {
   background-color: #1a1a2e;
   color: #eaeaea;
   border: 1px solid #0f3460;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.6rem;
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 
@@ -60,27 +103,43 @@
   border-color: #e94560;
 }
 
+.render-mode-selector select:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
+}
+
 .header-divider {
   width: 1px;
-  height: 1.5rem;
+  height: 1.25rem;
   background-color: #0f3460;
+  flex-shrink: 0;
 }
 
 .open-preview-btn {
   background-color: transparent;
   color: #a0a0a0;
   border: 1px solid #0f3460;
-  padding: 0.4rem 0.8rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: border-color 0.2s, color 0.2s;
 }
 
 .open-preview-btn:hover {
   border-color: #e94560;
   color: #eaeaea;
+}
+
+.open-preview-btn:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
+}
+
+.header .theme-btn-trigger:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
 }
 
 /* Preview-only mode for PDF export (new tab) — hide per-diagram Copy/Save */
