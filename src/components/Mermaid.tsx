@@ -9,17 +9,38 @@ interface MermaidProps {
   chart: string;
 }
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-  flowchart: {
-    // Enough room for multi-line labels; too large causes scaling/overlap.
-    padding: 24,
-    subGraphTitleMargin: { top: 8, bottom: 25 },
-    htmlLabels: true,
-  },
-});
+/** Max width (px) before node label text wraps — controls box width in vertical flowcharts. */
+const FLOWCHART_WRAPPING_WIDTH = 250;
+
+const FLOWCHART_SINGLE_LINE = {
+  padding: 16,
+  subGraphTitleMargin: { top: 6, bottom: 10 },
+  htmlLabels: true,
+  wrappingWidth: FLOWCHART_WRAPPING_WIDTH,
+} as const;
+
+const FLOWCHART_MULTI_LINE = {
+  padding: 24,
+  subGraphTitleMargin: { top: 8, bottom: 25 },
+  htmlLabels: true,
+  wrappingWidth: FLOWCHART_WRAPPING_WIDTH,
+} as const;
+
+/** Detect if chart uses multi-line labels (e.g. "Label<br/>line2" or [A<br/>B]). */
+function hasMultiLineLabels(chart: string): boolean {
+  return /<br\s*\/?>/i.test(chart);
+}
+
+function applyFlowchartConfig(multiLine: boolean) {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: multiLine ? FLOWCHART_MULTI_LINE : FLOWCHART_SINGLE_LINE,
+  });
+}
+
+applyFlowchartConfig(false);
 
 let mermaidId = 0;
 function nextMermaidId() {
@@ -100,6 +121,7 @@ export function Mermaid({ chart }: MermaidProps) {
 
       try {
         if (renderMode === 'default') {
+          applyFlowchartConfig(hasMultiLineLabels(chart));
           const id = nextMermaidId();
           const { svg } = await mermaid.render(id, chart);
           setSvg(svg);
