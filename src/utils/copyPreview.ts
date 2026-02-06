@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas';
+import { FLOWCHART_PADDING } from '../config/flowchart';
 
 export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
 
@@ -186,20 +187,24 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
 
+  const pad = FLOWCHART_PADDING;
+  const totalWidth = width + pad * 2;
+  const totalHeight = height + pad * 2;
+
   return new Promise<string>((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
       try {
         const scale = 2;
         const canvas = document.createElement('canvas');
-        canvas.width = width * scale;
-        canvas.height = height * scale;
+        canvas.width = totalWidth * scale;
+        canvas.height = totalHeight * scale;
 
         const ctx = canvas.getContext('2d')!;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.scale(scale, scale);
-        ctx.drawImage(image, 0, 0, width, height);
+        ctx.drawImage(image, pad, pad, width, height);
 
         resolve(canvas.toDataURL('image/png'));
       } catch (err) {

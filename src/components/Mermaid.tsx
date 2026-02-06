@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { renderMermaid, renderMermaidAscii } from 'beautiful-mermaid';
+import { flowchartConfig } from '../config/flowchart';
 import { useMermaidContext } from '../context/MermaidContext';
 import type { ThemeConfig } from '../context/MermaidContext';
 import { copyDiagramToClipboard, saveDiagramAsFile } from '../utils/copyPreview';
@@ -13,12 +14,7 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'loose',
-  flowchart: {
-    padding: 24,
-    subGraphTitleMargin: { top: 14, bottom: 25 },
-    htmlLabels: true,
-    wrappingWidth: 250,
-  },
+  flowchart: flowchartConfig,
 });
 
 let mermaidId = 0;
