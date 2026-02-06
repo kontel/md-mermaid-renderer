@@ -93,8 +93,8 @@ function RenderModeSelector() {
         title="Choose how Mermaid diagrams are rendered"
       >
         <option value="default">Default (mermaid.js)</option>
-        <option value="beautiful-svg">Beautiful SVG</option>
-        <option value="beautiful-ascii">Beautiful ASCII</option>
+        <option value="beautiful-svg">Beautiful Mermaid (SVG)</option>
+        <option value="beautiful-ascii">Beautiful Mermaid (ASCII)</option>
       </select>
       {isBeautiful && (
         <button
@@ -112,7 +112,6 @@ function RenderModeSelector() {
 function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
-  const [showOptions, setShowOptions] = useState(false);
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
@@ -130,31 +129,23 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
       <button
         className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
         onClick={handleCopy}
-        title="Copy preview as rich HTML with diagrams as images"
+        title="Copy preview to clipboard (rich HTML with diagrams as images)"
       >
-        {status === 'idle' && 'Copy'}
+        {status === 'idle' && 'Copy to clipboard'}
         {status === 'copied' && 'Copied!'}
         {status === 'failed' && 'Failed'}
       </button>
-      <button
-        className={`copy-options-toggle ${showOptions ? 'copy-options-toggle--active' : ''}`}
-        onClick={() => setShowOptions(!showOptions)}
-        title="Image conversion options"
+      <select
+        className="copy-strategy-select"
+        value={strategy}
+        onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+        title="How diagrams are converted to images for pasting"
+        aria-label="Copy strategy"
       >
-        &#9662;
-      </button>
-      {showOptions && (
-        <select
-          className="copy-strategy-select"
-          value={strategy}
-          onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
-          title="How diagrams are converted to images for pasting"
-        >
-          <option value="auto">Auto</option>
-          <option value="svg-pipeline">SVG (fast)</option>
-          <option value="dom-capture">DOM (pixel-perfect)</option>
-        </select>
-      )}
+        <option value="auto">Auto</option>
+        <option value="svg-pipeline">SVG (fast)</option>
+        <option value="dom-capture">DOM (pixel-perfect)</option>
+      </select>
     </div>
   );
 }
@@ -220,7 +211,7 @@ function AppContent() {
             onClick={openPreviewTab}
             title="Open a standalone preview tab for PDF export"
           >
-            New Tab
+            Open in a new tab
           </button>
         </div>
       </header>

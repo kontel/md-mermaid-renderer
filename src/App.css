@@ -66,7 +66,8 @@
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  min-height: 2.25rem;
 }
 
 .render-mode-selector {
@@ -75,23 +76,22 @@
   gap: 0.5rem;
 }
 
-.render-mode-selector .theme-btn-trigger {
-  margin-left: 0.25rem;
-}
-
 .render-mode-selector label {
   color: #a0a0a0;
   font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 .render-mode-selector select {
   background-color: #1a1a2e;
   color: #eaeaea;
   border: 1px solid #0f3460;
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.6rem;
+  min-height: 2.25rem;
   border-radius: 4px;
   font-size: 0.8125rem;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .render-mode-selector select:hover {
@@ -108,18 +108,44 @@
   outline-offset: 2px;
 }
 
+.header .theme-btn-trigger {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background-color: #0f3460;
+  color: #eaeaea;
+  cursor: pointer;
+  font-weight: 500;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.header .theme-btn-trigger:hover {
+  background-color: #16213e;
+  border-color: #e94560;
+}
+
+.header .theme-btn-trigger:focus-visible {
+  outline: 2px solid #e94560;
+  outline-offset: 2px;
+}
+
 .header-divider {
   width: 1px;
-  height: 1.25rem;
+  height: 2.25rem;
   background-color: #0f3460;
   flex-shrink: 0;
+  align-self: stretch;
 }
 
 .open-preview-btn {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  box-sizing: border-box;
   background-color: transparent;
   color: #a0a0a0;
   border: 1px solid #0f3460;
-  padding: 0.35rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.8125rem;
@@ -133,11 +159,6 @@
 }
 
 .open-preview-btn:focus-visible {
-  outline: 2px solid #e94560;
-  outline-offset: 2px;
-}
-
-.header .theme-btn-trigger:focus-visible {
   outline: 2px solid #e94560;
   outline-offset: 2px;
 }
@@ -205,11 +226,11 @@
   align-items: center;
 }
 
-/* Copy Preview Controls */
+/* Copy Preview Controls — single click to copy, strategy always visible */
 .copy-preview-group {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .copy-preview-btn {
@@ -217,13 +238,13 @@
   color: #eaeaea;
   border: 1px solid #0f3460;
   padding: 0.25rem 0.65rem;
-  border-radius: 4px 0 0 4px;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: none;
   letter-spacing: normal;
-  transition: all 0.2s;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 
 .copy-preview-btn:hover {
@@ -243,40 +264,16 @@
   color: white;
 }
 
-.copy-options-toggle {
-  background-color: #0f3460;
-  color: #a0a0a0;
-  border: 1px solid #0f3460;
-  border-left: none;
-  padding: 0.25rem 0.3rem;
-  border-radius: 0 4px 4px 0;
-  cursor: pointer;
-  font-size: 0.6rem;
-  line-height: 1;
-  transition: all 0.2s;
-}
-
-.copy-options-toggle:hover {
-  background-color: #16213e;
-  border-color: #e94560;
-  color: #eaeaea;
-}
-
-.copy-options-toggle--active {
-  color: #e94560;
-}
-
 .copy-strategy-select {
   background-color: #1a1a2e;
   color: #a0a0a0;
   border: 1px solid #0f3460;
-  padding: 0.2rem 0.35rem;
+  padding: 0.25rem 0.4rem;
   border-radius: 4px;
   font-size: 0.7rem;
   cursor: pointer;
   text-transform: none;
   letter-spacing: normal;
-  margin-left: 0.25rem;
 }
 
 .copy-strategy-select:hover {
