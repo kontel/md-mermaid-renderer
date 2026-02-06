@@ -13,7 +13,11 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'loose',
-});
+  useMaxWidth: false,
+  flowchart: { useMaxWidth: false },
+  classDiagram: { useMaxWidth: false },
+  sequence: { useMaxWidth: false },
+} as Parameters<typeof mermaid.initialize>[0]);
 
 let mermaidId = 0;
 function nextMermaidId() {
