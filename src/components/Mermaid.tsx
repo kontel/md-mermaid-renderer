@@ -37,6 +37,26 @@ function buildThemeOptions(config: ThemeConfig) {
   return options;
 }
 
+/** Ensure root <svg> has explicit width/height from viewBox so all browsers size consistently (avoids 300×150 default). */
+function ensureSvgDimensions(svgString: string): string {
+  const viewBoxMatch = svgString.match(/<svg[^>]*\sviewBox=["']([^"']+)["']/i);
+  if (!viewBoxMatch) return svgString;
+  const parts = viewBoxMatch[1].trim().split(/\s+/);
+  const vbWidth = parts[2] ? parseFloat(parts[2]) : 0;
+  const vbHeight = parts[3] ? parseFloat(parts[3]) : 0;
+  if (!(vbWidth > 0 && vbHeight > 0)) return svgString;
+  const hasWidth = /<svg[^>]*\swidth\s*=/i.test(svgString);
+  const hasHeight = /<svg[^>]*\sheight\s*=/i.test(svgString);
+  if (hasWidth && hasHeight) return svgString;
+  const firstTag = svgString.match(/<svg[^>]*>/);
+  if (!firstTag) return svgString;
+  const insert = [
+    !hasWidth ? ` width="${vbWidth}"` : '',
+    !hasHeight ? ` height="${vbHeight}"` : '',
+  ].join('');
+  return svgString.replace(/<svg([^>]*)>/, `<svg$1${insert}>`);
+}
+
 // Inline SVG icon components (no external deps)
 function CopyIcon() {
   return (
@@ -148,14 +168,14 @@ export function Mermaid({ chart }: MermaidProps) {
       try {
         if (renderMode === 'default') {
           const id = nextMermaidId();
-          const { svg } = await mermaid.render(id, chart);
-          setSvg(svg);
+          const { svg: rawSvg } = await mermaid.render(id, chart);
+          setSvg(ensureSvgDimensions(rawSvg));
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-svg') {
           const themeOptions = buildThemeOptions(themeConfig);
           const svgResult = await renderMermaid(chart, themeOptions);
-          setSvg(svgResult);
+          setSvg(ensureSvgDimensions(svgResult));
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-ascii') {
