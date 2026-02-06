@@ -71,6 +71,16 @@ function escapeXml(unsafe: string): string {
     .replace(/'/g, '&apos;');
 }
 
+/** Decode HTML entities so "Setup &amp; init" becomes "Setup & init" before we re-escape for SVG. */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'");
+}
+
 function applyInlineStyles(root: HTMLElement) {
   for (const [selector, styles] of Object.entries(INLINE_STYLES)) {
     const elements = selector === '.markdown-body'
@@ -123,7 +133,10 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
         .trim();
       if (!withNewlines) return '';
 
-      const lines = withNewlines.split(/\n/).map((s) => s.trim()).filter(Boolean);
+      const lines = withNewlines
+        .split(/\n/)
+        .map((s) => decodeHtmlEntities(s.trim()))
+        .filter(Boolean);
       if (lines.length === 0) return '';
 
       const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');

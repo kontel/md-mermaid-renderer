@@ -13,6 +13,12 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'loose',
+  flowchart: {
+    // Enough room for multi-line labels; too large causes scaling/overlap.
+    padding: 24,
+    subGraphTitleMargin: { top: 8, bottom: 25 },
+    htmlLabels: true,
+  },
 });
 
 let mermaidId = 0;

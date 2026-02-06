@@ -26,11 +26,35 @@ This is a **markdown** renderer with support for *inline* Mermaid diagrams.
 
 \`\`\`mermaid
 flowchart TD
-    A[Start] --> B{Is it working?}
-    B -->|Yes| C[Great!]
-    B -->|No| D[Debug]
+    subgraph init["Setup<br/>& init"]
+        A[Start]
+    end
+    subgraph check["Check<br/>status"]
+        B{Is it working?<br/>test}
+    end
+    subgraph actions["Actions<br/>& results"]
+        C[Great!]
+        D[Debug]
+    end
+    subgraph done["Finish"]
+        E[End]
+    end
+    A --> B
+    B -->|Yes| C
+    B -->|No| D
     D --> B
+    C --> E
+\`\`\`
+
+## Simple Flow Diagram
+
+\`\`\`mermaid
+flowchart LR
+    A[Start] --> B{Choice}
+    B -->|One| C[Step 1]
+    B -->|Two| D[Step 2]
     C --> E[End]
+    D --> E
 \`\`\`
 
 ## Sequence Diagram
