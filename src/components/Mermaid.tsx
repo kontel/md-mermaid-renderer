@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { renderMermaid, renderMermaidAscii } from 'beautiful-mermaid';
 import { useMermaidContext } from '../context/MermaidContext';
 import type { ThemeConfig } from '../context/MermaidContext';
-import { copyDiagramToClipboard, saveDiagramAsFile } from '../utils/copyPreview';
 
 interface MermaidProps {
   chart: string;
@@ -13,11 +12,7 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'loose',
-  useMaxWidth: false,
-  flowchart: { useMaxWidth: false },
-  classDiagram: { useMaxWidth: false },
-  sequence: { useMaxWidth: false },
-} as Parameters<typeof mermaid.initialize>[0]);
+});
 
 let mermaidId = 0;
 function nextMermaidId() {
@@ -41,132 +36,9 @@ function buildThemeOptions(config: ThemeConfig) {
   return options;
 }
 
-/**
- * Normalize root <svg> so all diagram types render at consistent scale across
- * browsers and machines. Mermaid injects inline style="max-width: Xpx" based
- * on the container size at render time, which differs per device → different
- * <g> pixel dimensions for the same diagram. We strip that and control size
- * ourselves so the same SVG string renders consistently.
- */
-const REFERENCE_SVG_WIDTH = 800;
-
-function ensureSvgDimensions(svgString: string): string {
-  const viewBoxMatch = svgString.match(/<svg[^>]*\sviewBox=["']([^"']+)["']/i);
-  if (!viewBoxMatch) return svgString;
-  const parts = viewBoxMatch[1].trim().split(/\s+/);
-  const vbWidth = parts[2] ? parseFloat(parts[2]) : 0;
-  const vbHeight = parts[3] ? parseFloat(parts[3]) : 0;
-  if (!(vbWidth > 0 && vbHeight > 0)) return svgString;
-
-  const refW = REFERENCE_SVG_WIDTH;
-  const refH = Math.round(refW * (vbHeight / vbWidth));
-
-  return svgString.replace(/<svg\s*([^>]*)>/, (_match, attrs: string) => {
-    const cleaned = (attrs || '')
-      .replace(/\s*width\s*=\s*["'][^"']*["']/gi, '')
-      .replace(/\s*height\s*=\s*["'][^"']*["']/gi, '')
-      .replace(/\s*style\s*=\s*["'][^"']*["']/gi, '') // Mermaid injects max-width here → strip so we control size
-      .trim();
-    const rest = cleaned ? ` ${cleaned}` : '';
-    return `<svg${rest} width="${refW}" height="${refH}">`;
-  });
-}
-
-// Inline SVG icon components (no external deps)
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="5.5" y="5.5" width="9" height="9" rx="1.5" />
-      <path d="M10.5 5.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h2.5" />
-    </svg>
-  );
-}
-
-function SaveIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M8 2v8M4.5 6.5 8 10l3.5-3.5" />
-      <path d="M2 11v2.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V11" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 8.5 6.5 12 13 4" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 4l8 8M12 4l-8 8" />
-    </svg>
-  );
-}
-
-type ActionStatus = 'idle' | 'done' | 'failed';
-
-function DiagramToolbar({ containerRef }: { containerRef: React.RefObject<HTMLElement | null> }) {
-  const [copyStatus, setCopyStatus] = useState<ActionStatus>('idle');
-  const [saveStatus, setSaveStatus] = useState<ActionStatus>('idle');
-
-  const handleCopy = useCallback(async () => {
-    if (!containerRef.current) return;
-    try {
-      await copyDiagramToClipboard(containerRef.current);
-      setCopyStatus('done');
-    } catch {
-      setCopyStatus('failed');
-    }
-    setTimeout(() => setCopyStatus('idle'), 2000);
-  }, [containerRef]);
-
-  const handleSave = useCallback(async () => {
-    if (!containerRef.current) return;
-    try {
-      await saveDiagramAsFile(containerRef.current, `mermaid-diagram-${Date.now()}.png`);
-      setSaveStatus('done');
-    } catch {
-      setSaveStatus('failed');
-    }
-    setTimeout(() => setSaveStatus('idle'), 2000);
-  }, [containerRef]);
-
-  const copyIcon = copyStatus === 'done' ? <CheckIcon /> : copyStatus === 'failed' ? <XIcon /> : <CopyIcon />;
-  const saveIcon = saveStatus === 'done' ? <CheckIcon /> : saveStatus === 'failed' ? <XIcon /> : <SaveIcon />;
-  const copyLabel = copyStatus === 'done' ? 'Copied' : copyStatus === 'failed' ? 'Failed' : 'Copy';
-  const saveLabel = saveStatus === 'done' ? 'Saved' : saveStatus === 'failed' ? 'Failed' : 'Save';
-
-  return (
-    <div className="diagram-toolbar">
-      <button
-        className={`diagram-toolbar-btn ${copyStatus !== 'idle' ? `diagram-toolbar-btn--${copyStatus}` : ''}`}
-        onClick={handleCopy}
-        aria-label="Copy diagram to clipboard"
-        title="Copy to clipboard"
-      >
-        {copyIcon}
-        <span className="diagram-toolbar-label">{copyLabel}</span>
-      </button>
-      <button
-        className={`diagram-toolbar-btn ${saveStatus !== 'idle' ? `diagram-toolbar-btn--${saveStatus}` : ''}`}
-        onClick={handleSave}
-        aria-label="Save diagram as PNG"
-        title="Save as PNG"
-      >
-        {saveIcon}
-        <span className="diagram-toolbar-label">{saveLabel}</span>
-      </button>
-    </div>
-  );
-}
-
 export function Mermaid({ chart }: MermaidProps) {
   const { renderMode, themeConfig } = useMermaidContext();
-  const containerRef = useRef<HTMLElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>('');
   const [ascii, setAscii] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -184,13 +56,13 @@ export function Mermaid({ chart }: MermaidProps) {
         if (renderMode === 'default') {
           const id = nextMermaidId();
           const { svg: rawSvg } = await mermaid.render(id, chart);
-          setSvg(ensureSvgDimensions(rawSvg));
+          setSvg(rawSvg);
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-svg') {
           const themeOptions = buildThemeOptions(themeConfig);
           const svgResult = await renderMermaid(chart, themeOptions);
-          setSvg(ensureSvgDimensions(svgResult));
+          setSvg(svgResult);
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-ascii') {
@@ -210,70 +82,6 @@ export function Mermaid({ chart }: MermaidProps) {
     renderChart();
   }, [chart, renderMode, themeConfig]);
 
-  // DOM fix: (1) Remove root SVG inline style (Mermaid's max-width). (2) If
-  // viewBox is oversized/offset (e.g. -81 -81 2000 2000 on one machine), tighten
-  // it to the actual content bounds so the diagram fills the space.
-  useEffect(() => {
-    if (!svg || !containerRef.current) return;
-    const root = containerRef.current.querySelector('svg');
-    if (!root) return;
-
-    const run = () => {
-      if (root.getAttribute('style')) root.removeAttribute('style');
-
-      const vb = root.viewBox?.baseVal;
-      if (vb) {
-        const oversize = vb.width > 600 || vb.height > 600 || vb.x < -50 || vb.y < -50;
-        if (oversize) {
-          try {
-            let bbox = root.getBBox();
-            // Class diagrams (and some others) can report root getBBox() as the full
-            // viewBox (~2000x2000). Use the tightest getBBox() from direct or nested <g>.
-            if (bbox.width > 1000 || bbox.height > 1000) {
-              const collectG = (parent: Element): SVGGElement[] => {
-                const out: SVGGElement[] = [];
-                for (const el of parent.children) {
-                  if (el.tagName === 'g') out.push(el as SVGGElement);
-                }
-                return out;
-              };
-              const direct = collectG(root);
-              const nested = direct.flatMap((g) => collectG(g));
-              for (const g of [...direct, ...nested]) {
-                try {
-                  const gBox = g.getBBox();
-                  if (gBox.width > 0 && gBox.height > 0 && gBox.width * gBox.height < bbox.width * bbox.height) {
-                    bbox = gBox;
-                  }
-                } catch {
-                  /* skip */
-                }
-              }
-            }
-            if (bbox.width > 0 && bbox.height > 0) {
-              const pad = 12;
-              const x = bbox.x - pad;
-              const y = bbox.y - pad;
-              const w = bbox.width + 2 * pad;
-              const h = bbox.height + 2 * pad;
-              root.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
-              const refW = REFERENCE_SVG_WIDTH;
-              const refH = Math.round(refW * (h / w));
-              root.setAttribute('width', String(refW));
-              root.setAttribute('height', String(refH));
-            }
-          } catch {
-            // getBBox can fail in some edge cases; leave viewBox as-is
-          }
-        }
-      }
-    };
-
-    run();
-    const t = requestAnimationFrame(run);
-    return () => cancelAnimationFrame(t);
-  }, [svg]);
-
   if (error) {
     return (
       <div className="mermaid-error">
@@ -284,25 +92,19 @@ export function Mermaid({ chart }: MermaidProps) {
 
   if (renderMode === 'beautiful-ascii' && ascii) {
     return (
-      <div className="mermaid-wrapper">
-        <pre ref={containerRef as React.RefObject<HTMLPreElement | null>} className="mermaid-ascii" role="img" aria-label="Mermaid diagram (ASCII)">
-          {ascii}
-        </pre>
-        <DiagramToolbar containerRef={containerRef} />
-      </div>
+      <pre className="mermaid-ascii" role="img" aria-label="Mermaid diagram (ASCII)">
+        {ascii}
+      </pre>
     );
   }
 
   return (
-    <div className="mermaid-wrapper">
-      <div
-        ref={containerRef as React.RefObject<HTMLDivElement | null>}
-        className="mermaid-container"
-        role="img"
-        aria-label="Mermaid diagram"
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-      <DiagramToolbar containerRef={containerRef} />
-    </div>
+    <div
+      ref={containerRef}
+      className="mermaid-container"
+      role="img"
+      aria-label="Mermaid diagram"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }

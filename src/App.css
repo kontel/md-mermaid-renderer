@@ -138,9 +138,6 @@
     break-inside: avoid;
   }
 
-  .diagram-toolbar {
-    display: none;
-  }
 }
 
 .main {
@@ -385,45 +382,19 @@
 }
 
 /* Mermaid styles */
-.mermaid-wrapper {
-  position: relative;
-  margin: 1.5em 0;
-  width: 100%;
-  min-width: 0; /* allow flex shrink so overflow scroll works */
-}
-
-.mermaid-wrapper:hover .diagram-toolbar,
-.mermaid-wrapper:focus-within .diagram-toolbar {
-  opacity: 1;
-}
-
 .mermaid-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  width: 100%;
-  min-width: 0;
   padding: 1em;
   background-color: #fff;
   border: 1px solid #e1e4e8;
   border-radius: 6px;
-  overflow: visible;
+  margin: 1.5em 0;
 }
 
-/* Inner div (ref + dangerouslySetInnerHTML) must take full width so SVG has a proper containing block */
-.mermaid-container > div {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-/* SVGs from Mermaid often have viewBox but no width/height; default size is 300x150 so they render tiny.
-   Force full width and auto height so viewBox aspect ratio is preserved and diagram scales correctly. */
 .mermaid-container svg {
-  width: 100%;
   max-width: 100%;
   height: auto;
-  display: block;
 }
 
 .mermaid-error {
@@ -438,7 +409,7 @@
 
 .mermaid-ascii {
   display: block;
-  margin: 0;
+  margin: 1.5em 0;
   padding: 1em;
   background-color: #1a1a2e;
   color: #eaeaea;
@@ -449,70 +420,6 @@
   line-height: 1.4;
   overflow-x: auto;
   white-space: pre;
-}
-
-/* Diagram toolbar (copy / save buttons) */
-.diagram-toolbar {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  display: flex;
-  gap: 0.35rem;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.diagram-toolbar-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.95);
-  color: #57606a;
-  cursor: pointer;
-  font-size: 0.7rem;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
-}
-
-.diagram-toolbar-btn:hover {
-  background-color: #ffffff;
-  border-color: #0366d6;
-  color: #0366d6;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-
-.diagram-toolbar-label {
-  pointer-events: none;
-}
-
-.diagram-toolbar-btn--done {
-  background-color: #dafbe1;
-  border-color: #2da44e;
-  color: #1a7f37;
-}
-
-.diagram-toolbar-btn--done:hover {
-  background-color: #dafbe1;
-  border-color: #2da44e;
-  color: #1a7f37;
-}
-
-.diagram-toolbar-btn--failed {
-  background-color: #ffebe9;
-  border-color: #cf222e;
-  color: #cf222e;
-}
-
-.diagram-toolbar-btn--failed:hover {
-  background-color: #ffebe9;
-  border-color: #cf222e;
-  color: #cf222e;
 }
 
 /* Theme Button Trigger */
