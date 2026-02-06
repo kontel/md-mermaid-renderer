@@ -70,7 +70,7 @@ function applyInlineStyles(root: HTMLElement) {
 
     for (const el of elements) {
       for (const [prop, val] of Object.entries(styles)) {
-        el.style[prop as any] = val;
+        el.style[prop as never] = val;
       }
     }
   }
