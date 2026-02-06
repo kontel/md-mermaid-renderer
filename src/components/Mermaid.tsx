@@ -222,7 +222,30 @@ export function Mermaid({ chart }: MermaidProps) {
         const oversize = vb.width > 600 || vb.height > 600 || vb.x < -50 || vb.y < -50;
         if (oversize) {
           try {
-            const bbox = root.getBBox();
+            let bbox = root.getBBox();
+            // Class diagrams (and some others) can report root getBBox() as the full
+            // viewBox (~2000x2000). Use the tightest getBBox() from direct or nested <g>.
+            if (bbox.width > 1000 || bbox.height > 1000) {
+              const collectG = (parent: Element): SVGGElement[] => {
+                const out: SVGGElement[] = [];
+                for (const el of parent.children) {
+                  if (el.tagName === 'g') out.push(el as SVGGElement);
+                }
+                return out;
+              };
+              const direct = collectG(root);
+              const nested = direct.flatMap((g) => collectG(g));
+              for (const g of [...direct, ...nested]) {
+                try {
+                  const gBox = g.getBBox();
+                  if (gBox.width > 0 && gBox.height > 0 && gBox.width * gBox.height < bbox.width * bbox.height) {
+                    bbox = gBox;
+                  }
+                } catch {
+                  /* skip */
+                }
+              }
+            }
             if (bbox.width > 0 && bbox.height > 0) {
               const pad = 12;
               const x = bbox.x - pad;
