@@ -38,11 +38,11 @@ function buildThemeOptions(config: ThemeConfig) {
 }
 
 /**
- * Normalize root <svg> so all diagram types render at consistent scale.
- * - Use a fixed reference width (800) so large viewBoxes (e.g. class diagrams)
- *   don't get huge intrinsic size and then scale down to tiny text.
- * - Strip any existing width/height and set normalized size so flowchart,
- *   sequence, and class diagrams all scale the same.
+ * Normalize root <svg> so all diagram types render at consistent scale across
+ * browsers and machines. Mermaid injects inline style="max-width: Xpx" based
+ * on the container size at render time, which differs per device → different
+ * <g> pixel dimensions for the same diagram. We strip that and control size
+ * ourselves so the same SVG string renders consistently.
  */
 const REFERENCE_SVG_WIDTH = 800;
 
@@ -61,6 +61,7 @@ function ensureSvgDimensions(svgString: string): string {
     const cleaned = (attrs || '')
       .replace(/\s*width\s*=\s*["'][^"']*["']/gi, '')
       .replace(/\s*height\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/\s*style\s*=\s*["'][^"']*["']/gi, '') // Mermaid injects max-width here → strip so we control size
       .trim();
     const rest = cleaned ? ` ${cleaned}` : '';
     return `<svg${rest} width="${refW}" height="${refH}">`;
