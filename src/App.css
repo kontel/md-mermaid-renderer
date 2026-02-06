@@ -258,7 +258,9 @@
 .preview {
   flex: 1;
   padding: 1.5rem;
+  overflow-x: auto;
   overflow-y: auto;
+  min-width: 0; /* allow flex child to shrink so overflow scroll works */
   background-color: #fafafa;
 }
 
@@ -386,6 +388,8 @@
 .mermaid-wrapper {
   position: relative;
   margin: 1.5em 0;
+  width: 100%;
+  min-width: 0; /* allow flex shrink so overflow scroll works */
 }
 
 .mermaid-wrapper:hover .diagram-toolbar,
@@ -396,15 +400,30 @@
 .mermaid-container {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
   padding: 1em;
   background-color: #fff;
   border: 1px solid #e1e4e8;
   border-radius: 6px;
+  overflow: visible;
 }
 
+/* Inner div (ref + dangerouslySetInnerHTML) must take full width so SVG has a proper containing block */
+.mermaid-container > div {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* SVGs from Mermaid often have viewBox but no width/height; default size is 300x150 so they render tiny.
+   Force full width and auto height so viewBox aspect ratio is preserved and diagram scales correctly. */
 .mermaid-container svg {
+  width: 100%;
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
 .mermaid-error {
