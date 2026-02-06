@@ -206,6 +206,47 @@ export function Mermaid({ chart }: MermaidProps) {
     renderChart();
   }, [chart, renderMode, themeConfig]);
 
+  // DOM fix: (1) Remove root SVG inline style (Mermaid's max-width). (2) If
+  // viewBox is oversized/offset (e.g. -81 -81 2000 2000 on one machine), tighten
+  // it to the actual content bounds so the diagram fills the space.
+  useEffect(() => {
+    if (!svg || !containerRef.current) return;
+    const root = containerRef.current.querySelector('svg');
+    if (!root) return;
+
+    const run = () => {
+      if (root.getAttribute('style')) root.removeAttribute('style');
+
+      const vb = root.viewBox?.baseVal;
+      if (vb) {
+        const oversize = vb.width > 600 || vb.height > 600 || vb.x < -50 || vb.y < -50;
+        if (oversize) {
+          try {
+            const bbox = root.getBBox();
+            if (bbox.width > 0 && bbox.height > 0) {
+              const pad = 12;
+              const x = bbox.x - pad;
+              const y = bbox.y - pad;
+              const w = bbox.width + 2 * pad;
+              const h = bbox.height + 2 * pad;
+              root.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+              const refW = REFERENCE_SVG_WIDTH;
+              const refH = Math.round(refW * (h / w));
+              root.setAttribute('width', String(refW));
+              root.setAttribute('height', String(refH));
+            }
+          } catch {
+            // getBBox can fail in some edge cases; leave viewBox as-is
+          }
+        }
+      }
+    };
+
+    run();
+    const t = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(t);
+  }, [svg]);
+
   if (error) {
     return (
       <div className="mermaid-error">
