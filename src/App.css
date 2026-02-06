@@ -83,7 +83,11 @@
   color: #eaeaea;
 }
 
-/* Preview-only mode for PDF export */
+/* Preview-only mode for PDF export (new tab) — hide per-diagram Copy/Save */
+.preview-only .diagram-actions {
+  display: none;
+}
+
 .preview-only {
   background-color: #ffffff;
   padding: 2rem;

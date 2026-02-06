@@ -287,6 +287,8 @@ export async function copyPreview(
 ): Promise<void> {
   const clone = previewEl.cloneNode(true) as HTMLElement;
 
+  clone.querySelectorAll('.diagram-actions').forEach((el) => el.remove());
+
   const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
