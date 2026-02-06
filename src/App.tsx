@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
-import { Onboarding } from './components/Onboarding';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
@@ -9,10 +8,6 @@ import type { CopyStrategy } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
-
-const KONTEL_AVATAR_URL = `${import.meta.env.BASE_URL}kontel-avatar.jpg`;
-
-const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
 
 const defaultMarkdown = `# Markdown with Mermaid Demo
 
@@ -81,7 +76,7 @@ classDiagram
 \`\`\`
 `;
 
-const RenderModeSelector = memo(function RenderModeSelector() {
+function RenderModeSelector() {
   const { renderMode, setRenderMode, setDrawerOpen } = useMermaidContext();
   const isBeautiful = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
 
@@ -109,11 +104,12 @@ const RenderModeSelector = memo(function RenderModeSelector() {
       )}
     </div>
   );
-});
+}
 
-const CopyPreviewButton = memo(function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
+function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
+  const [showOptions, setShowOptions] = useState(false);
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
@@ -126,8 +122,6 @@ const CopyPreviewButton = memo(function CopyPreviewButton({ previewRef }: { prev
     setTimeout(() => setStatus('idle'), 2000);
   };
 
-  const statusLabel = status === 'idle' ? 'Copy Preview' : status === 'copied' ? 'Copied!' : 'Failed';
-
   return (
     <div className="copy-preview-group">
       <button
@@ -135,27 +129,35 @@ const CopyPreviewButton = memo(function CopyPreviewButton({ previewRef }: { prev
         onClick={handleCopy}
         title="Copy preview as rich HTML with diagrams as images"
       >
-        {statusLabel}
+        {status === 'idle' && 'Copy'}
+        {status === 'copied' && 'Copied!'}
+        {status === 'failed' && 'Failed'}
       </button>
-      <select
-        className="copy-strategy-select"
-        value={strategy}
-        onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
-        title="How diagrams are converted to images for pasting"
-        aria-label="Diagram conversion strategy"
+      <button
+        className={`copy-options-toggle ${showOptions ? 'copy-options-toggle--active' : ''}`}
+        onClick={() => setShowOptions(!showOptions)}
+        title="Image conversion options"
       >
-        <option value="auto">Auto</option>
-        <option value="svg-pipeline">SVG (fast)</option>
-        <option value="dom-capture">DOM (pixel-perfect)</option>
-      </select>
-      <span aria-live="polite" className="sr-only">
-        {status === 'copied' ? 'Preview copied to clipboard' : status === 'failed' ? 'Copy failed' : ''}
-      </span>
+        &#9662;
+      </button>
+      {showOptions && (
+        <select
+          className="copy-strategy-select"
+          value={strategy}
+          onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+          title="How diagrams are converted to images for pasting"
+        >
+          <option value="auto">Auto</option>
+          <option value="svg-pipeline">SVG (fast)</option>
+          <option value="dom-capture">DOM (pixel-perfect)</option>
+        </select>
+      )}
     </div>
   );
-});
+}
 
 function AppContent() {
+  const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
   const previewRef = useRef<HTMLDivElement>(null);
 
   const [markdown, setMarkdown] = useState(() => {
@@ -169,7 +171,7 @@ function AppContent() {
     if (!isPreviewMode) {
       localStorage.setItem(STORAGE_KEY, markdown);
     }
-  }, [markdown]);
+  }, [markdown, isPreviewMode]);
 
   const openPreviewTab = () => {
     localStorage.setItem(STORAGE_KEY, markdown);
@@ -187,39 +189,23 @@ function AppContent() {
   return (
     <div className="app">
       <header className="header">
-        <div className="header-brand">
-          <h1>Markdown + Mermaid</h1>
-          <a
-            href="https://github.com/kontel"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-byline"
-            title="kontel on GitHub"
-          >
-            <img src={KONTEL_AVATAR_URL} alt="" className="header-avatar" width={20} height={20} />
-            <span>created by kontel</span>
-          </a>
-        </div>
+        <h1>Markdown + Mermaid Renderer</h1>
         <div className="header-controls">
           <RenderModeSelector />
-          <div className="header-divider" />
-          <CopyPreviewButton previewRef={previewRef} />
           <div className="header-divider" />
           <button
             className="open-preview-btn"
             onClick={openPreviewTab}
             title="Open a standalone preview tab for PDF export"
           >
-            Open Preview
+            New Tab
           </button>
         </div>
       </header>
-      <Onboarding />
       <main className="main">
         <div className="editor-pane">
-          <label htmlFor="markdown-editor" className="pane-header">Editor</label>
+          <div className="pane-header">Editor</div>
           <textarea
-            id="markdown-editor"
             className="editor"
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
@@ -228,7 +214,10 @@ function AppContent() {
           />
         </div>
         <div className="preview-pane">
-          <div className="pane-header">Preview</div>
+          <div className="pane-header">
+            Preview
+            <CopyPreviewButton previewRef={previewRef} />
+          </div>
           <div className="preview" ref={previewRef}>
             <MarkdownRenderer content={markdown} />
           </div>

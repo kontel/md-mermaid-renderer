@@ -55,8 +55,8 @@ export function Mermaid({ chart }: MermaidProps) {
       try {
         if (renderMode === 'default') {
           const id = nextMermaidId();
-          const { svg: rawSvg } = await mermaid.render(id, chart);
-          setSvg(rawSvg);
+          const { svg } = await mermaid.render(id, chart);
+          setSvg(svg);
           setAscii('');
           setError(null);
         } else if (renderMode === 'beautiful-svg') {
@@ -92,7 +92,7 @@ export function Mermaid({ chart }: MermaidProps) {
 
   if (renderMode === 'beautiful-ascii' && ascii) {
     return (
-      <pre className="mermaid-ascii" role="img" aria-label="Mermaid diagram (ASCII)">
+      <pre className="mermaid-ascii">
         {ascii}
       </pre>
     );
@@ -102,8 +102,6 @@ export function Mermaid({ chart }: MermaidProps) {
     <div
       ref={containerRef}
       className="mermaid-container"
-      role="img"
-      aria-label="Mermaid diagram"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );

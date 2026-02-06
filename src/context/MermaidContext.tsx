@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 export type MermaidRenderMode = 'default' | 'beautiful-svg' | 'beautiful-ascii';
@@ -89,10 +89,6 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
   const [themeConfig, setThemeConfig] = useState<ThemeConfig>(loadThemeConfig);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
-  const stableSetRenderMode = useCallback((mode: MermaidRenderMode) => setRenderMode(mode), []);
-  const stableSetThemeConfig = useCallback((config: ThemeConfig) => setThemeConfig(config), []);
-  const stableSetDrawerOpen = useCallback((open: boolean) => setDrawerOpen(open), []);
-
   useEffect(() => {
     localStorage.setItem(RENDER_MODE_STORAGE_KEY, renderMode);
   }, [renderMode]);
@@ -101,17 +97,15 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(THEME_CONFIG_STORAGE_KEY, JSON.stringify(themeConfig));
   }, [themeConfig]);
 
-  const value = useMemo(() => ({
-    renderMode,
-    setRenderMode: stableSetRenderMode,
-    themeConfig,
-    setThemeConfig: stableSetThemeConfig,
-    isDrawerOpen,
-    setDrawerOpen: stableSetDrawerOpen,
-  }), [renderMode, stableSetRenderMode, themeConfig, stableSetThemeConfig, isDrawerOpen, stableSetDrawerOpen]);
-
   return (
-    <MermaidContext.Provider value={value}>
+    <MermaidContext.Provider value={{
+      renderMode,
+      setRenderMode,
+      themeConfig,
+      setThemeConfig,
+      isDrawerOpen,
+      setDrawerOpen
+    }}>
       {children}
     </MermaidContext.Provider>
   );

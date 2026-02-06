@@ -5,14 +5,6 @@ export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
 /** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
 const MAX_PNG_WIDTH = 600;
 
-// Hoisted regex patterns for SVG processing
-const FOREIGN_OBJECT_RE = /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi;
-const HTML_TAG_RE = /<[^>]*>/g;
-const ATTR_X_RE = /\bx="([^"]*)"/;
-const ATTR_Y_RE = /\by="([^"]*)"/;
-const ATTR_WIDTH_RE = /\bwidth="([^"]*)"/;
-const ATTR_HEIGHT_RE = /\bheight="([^"]*)"/;
-
 const INLINE_STYLES: Record<string, Record<string, string>> = {
   '.markdown-body': {
     color: '#24292e',
@@ -112,15 +104,15 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
 
   // Replace foreignObject with SVG text to avoid canvas taint.
   svgString = svgString.replace(
-    FOREIGN_OBJECT_RE,
+    /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
     (_match, attrs: string, inner: string) => {
-      const textContent = inner.replace(HTML_TAG_RE, '').trim();
+      const textContent = inner.replace(/<[^>]*>/g, '').trim();
       if (!textContent) return '';
 
-      const x = parseFloat(ATTR_X_RE.exec(attrs)?.[1] || '0');
-      const y = parseFloat(ATTR_Y_RE.exec(attrs)?.[1] || '0');
-      const w = parseFloat(ATTR_WIDTH_RE.exec(attrs)?.[1] || '0');
-      const h = parseFloat(ATTR_HEIGHT_RE.exec(attrs)?.[1] || '0');
+      const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const w = parseFloat((/\bwidth="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const h = parseFloat((/\bheight="([^"]*)"/.exec(attrs))?.[1] || '0');
 
       const cx = x + w / 2;
       const cy = y + h / 2;
@@ -243,61 +235,6 @@ async function convertContainer(
 }
 
 // ---------------------------------------------------------------------------
-// Single-diagram helpers (used by Mermaid component toolbar)
-// ---------------------------------------------------------------------------
-
-/**
- * Convert a diagram container element to a PNG data URI.
- * Tries SVG pipeline first, falls back to DOM capture.
- */
-export async function diagramToPngDataUri(container: HTMLElement): Promise<string> {
-  const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
-
-  if (svgEl) {
-    try {
-      return await svgToPngDataUri(svgEl);
-    } catch {
-      // SVG pipeline failed — fall through to DOM capture
-    }
-  }
-
-  return await domToPngDataUri(container);
-}
-
-/** Convert a PNG data URI to a Blob. */
-function dataUriToBlob(dataUri: string): Blob {
-  const [header, base64] = dataUri.split(',');
-  const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
-  const bytes = atob(base64);
-  const arr = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-  return new Blob([arr], { type: mime });
-}
-
-/** Copy a single diagram container as a PNG image to the clipboard. */
-export async function copyDiagramToClipboard(container: HTMLElement): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container);
-  const blob = dataUriToBlob(dataUri);
-  await navigator.clipboard.write([
-    new ClipboardItem({ 'image/png': blob }),
-  ]);
-}
-
-/** Save a single diagram container as a PNG file download. */
-export async function saveDiagramAsFile(container: HTMLElement, filename = 'diagram.png'): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container);
-  const blob = dataUriToBlob(dataUri);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -310,11 +247,9 @@ export async function copyPreview(
   const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
-  await Promise.all(
-    Array.from(liveContainers).map((live, i) =>
-      convertContainer(live, cloneContainers[i], strategy)
-    )
-  );
+  for (let i = 0; i < liveContainers.length; i++) {
+    await convertContainer(liveContainers[i], cloneContainers[i], strategy);
+  }
 
   applyInlineStyles(clone);
 
