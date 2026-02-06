@@ -37,7 +37,15 @@ function buildThemeOptions(config: ThemeConfig) {
   return options;
 }
 
-/** Ensure root <svg> has explicit width/height from viewBox so all browsers size consistently (avoids 300×150 default). */
+/**
+ * Normalize root <svg> so all diagram types render at consistent scale.
+ * - Use a fixed reference width (800) so large viewBoxes (e.g. class diagrams)
+ *   don't get huge intrinsic size and then scale down to tiny text.
+ * - Strip any existing width/height and set normalized size so flowchart,
+ *   sequence, and class diagrams all scale the same.
+ */
+const REFERENCE_SVG_WIDTH = 800;
+
 function ensureSvgDimensions(svgString: string): string {
   const viewBoxMatch = svgString.match(/<svg[^>]*\sviewBox=["']([^"']+)["']/i);
   if (!viewBoxMatch) return svgString;
@@ -45,16 +53,18 @@ function ensureSvgDimensions(svgString: string): string {
   const vbWidth = parts[2] ? parseFloat(parts[2]) : 0;
   const vbHeight = parts[3] ? parseFloat(parts[3]) : 0;
   if (!(vbWidth > 0 && vbHeight > 0)) return svgString;
-  const hasWidth = /<svg[^>]*\swidth\s*=/i.test(svgString);
-  const hasHeight = /<svg[^>]*\sheight\s*=/i.test(svgString);
-  if (hasWidth && hasHeight) return svgString;
-  const firstTag = svgString.match(/<svg[^>]*>/);
-  if (!firstTag) return svgString;
-  const insert = [
-    !hasWidth ? ` width="${vbWidth}"` : '',
-    !hasHeight ? ` height="${vbHeight}"` : '',
-  ].join('');
-  return svgString.replace(/<svg([^>]*)>/, `<svg$1${insert}>`);
+
+  const refW = REFERENCE_SVG_WIDTH;
+  const refH = Math.round(refW * (vbHeight / vbWidth));
+
+  return svgString.replace(/<svg\s*([^>]*)>/, (_match, attrs: string) => {
+    const cleaned = (attrs || '')
+      .replace(/\s*width\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/\s*height\s*=\s*["'][^"']*["']/gi, '')
+      .trim();
+    const rest = cleaned ? ` ${cleaned}` : '';
+    return `<svg${rest} width="${refW}" height="${refH}">`;
+  });
 }
 
 // Inline SVG icon components (no external deps)
