@@ -62,6 +62,15 @@ const INLINE_STYLES: Record<string, Record<string, string>> = {
   },
 };
 
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function applyInlineStyles(root: HTMLElement) {
   for (const [selector, styles] of Object.entries(INLINE_STYLES)) {
     const elements = selector === '.markdown-body'
@@ -103,11 +112,19 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
   }
 
   // Replace foreignObject with SVG text to avoid canvas taint.
+  // Preserve line breaks from <br/>, <br>, <br /> so multi-line node labels render correctly.
+  // Edge labels get a light gray rounded rect behind them (copy/paste only).
   svgString = svgString.replace(
     /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
-    (_match, attrs: string, inner: string) => {
-      const textContent = inner.replace(/<[^>]*>/g, '').trim();
-      if (!textContent) return '';
+    (_match: string, attrs: string, inner: string, offset: number, fullString: string) => {
+      const withNewlines = inner
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+      if (!withNewlines) return '';
+
+      const lines = withNewlines.split(/\n/).map((s) => s.trim()).filter(Boolean);
+      if (lines.length === 0) return '';
 
       const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
       const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
@@ -116,10 +133,41 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
 
       const cx = x + w / 2;
       const cy = y + h / 2;
-      const fontSize = Math.max(10, Math.min(14, h * 0.45));
+      const fontSize = Math.max(12, Math.min(17, (h / Math.max(1, lines.length)) * 0.52));
+      const lineHeight = fontSize * 1.2;
+      const totalHeight = (lines.length - 1) * lineHeight;
+      const startY = cy - totalHeight / 2 + (fontSize * 0.35);
 
-      return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="arial, sans-serif" font-size="${fontSize}">${textContent}</text>`;
+      const tspans = lines
+        .map(
+          (line, i) =>
+            `<tspan x="${cx}" dy="${i === 0 ? 0 : lineHeight}" text-anchor="middle">${escapeXml(line)}</tspan>`,
+        )
+        .join('');
+
+      const textEl = `<text x="${cx}" y="${startY}" font-family="arial, sans-serif" font-size="${fontSize}">${tspans}</text>`;
+
+      const preceding = fullString.slice(Math.max(0, offset - 400), offset);
+      const isEdgeLabel = /edgeLabel|class="[^"]*edge[^"]*"/i.test(preceding);
+      if (isEdgeLabel) {
+        const pad = 5;
+        const rx = 6;
+        const r = x - pad;
+        const ry = y - pad;
+        const rw = w + pad * 2;
+        const rh = h + pad * 2;
+        const whiteBacker = `<rect x="${r}" y="${ry}" width="${rw}" height="${rh}" fill="#ffffff" fill-opacity="1" rx="${rx}" ry="${rx}"/>`;
+        const styledRect = `<rect x="${r}" y="${ry}" width="${rw}" height="${rh}" fill="#f6f8fa" fill-opacity="1" stroke="#e0e0e0" stroke-width="1" rx="${rx}" ry="${rx}"/>`;
+        return `<g opacity="1">${whiteBacker}${styledRect}${textEl}</g>`;
+      }
+      return textEl;
     },
+  );
+
+  // Remove node label background rect that causes double border (node has main shape + label rect).
+  svgString = svgString.replace(
+    /(<g[^>]*class="(?!.*edgeLabel)[^"]*label[^"]*"[^>]*>\s*)<rect[^>]*\/>\s*/gi,
+    '$1',
   );
 
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
