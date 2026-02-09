@@ -161,8 +161,14 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
 
       const textEl = `<text x="${cx}" y="${startY}" font-family="arial, sans-serif" font-size="${fontSize}">${tspans}</text>`;
 
-      const preceding = fullString.slice(Math.max(0, offset - 400), offset);
-      const isEdgeLabel = /edgeLabel|class="[^"]*edge[^"]*"/i.test(preceding);
+      // Detect edge labels only from a tight window around this foreignObject.
+      // A broad scan can misclassify nearby node labels (notably the first node)
+      // and introduce an extra rect that looks like a double border.
+      const around = fullString.slice(
+        Math.max(0, offset - 160),
+        Math.min(fullString.length, offset + 160),
+      );
+      const isEdgeLabel = /class="[^"]*edgeLabel[^"]*"/i.test(around);
       if (isEdgeLabel) {
         const pad = 5;
         const rx = 6;
@@ -178,10 +184,14 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
     },
   );
 
-  // Remove node label background rect that causes double border (node has main shape + label rect).
+  // Remove node label background rect that causes double borders.
+  // Handle both <rect .../> and <rect ...></rect> forms inside non-edge label groups.
   svgString = svgString.replace(
-    /(<g[^>]*class="(?!.*edgeLabel)[^"]*label[^"]*"[^>]*>\s*)<rect[^>]*\/>\s*/gi,
-    '$1',
+    /(<g[^>]*class="(?![^"]*edgeLabel)[^"]*\blabel\b[^"]*"[^>]*>)([\s\S]*?)(<\/g>)/gi,
+    (_match: string, open: string, body: string, close: string) => {
+      const cleanedBody = body.replace(/<rect\b[^>]*\/>\s*|<rect\b[^>]*>\s*<\/rect>\s*/gi, '');
+      return `${open}${cleanedBody}${close}`;
+    },
   );
 
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
