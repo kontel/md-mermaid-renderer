@@ -26,7 +26,7 @@ This is a **markdown** renderer with support for *inline* Mermaid diagrams.
 
 \`\`\`mermaid
 flowchart TD
-    subgraph init["Setup<br/>& init"]
+    subgraph init["Setup & initialization<br/>of core services"]
         A[Start]
     end
     subgraph check["Check<br/>status"]
