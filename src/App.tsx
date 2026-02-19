@@ -4,7 +4,7 @@ import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
-import type { CopyStrategy } from './utils/copyPreview';
+import type { CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -134,13 +134,14 @@ function RenderModeSelector() {
 }
 
 function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
+  const { labelWrapAggressiveness, setLabelWrapAggressiveness } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
     try {
-      await copyPreview(previewRef.current, strategy);
+      await copyPreview(previewRef.current, strategy, labelWrapAggressiveness);
       setStatus('copied');
     } catch {
       setStatus('failed');
@@ -169,6 +170,17 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
         <option value="auto">Auto</option>
         <option value="svg-pipeline">SVG (fast)</option>
         <option value="dom-capture">DOM (pixel-perfect)</option>
+      </select>
+      <select
+        className="copy-strategy-select"
+        value={labelWrapAggressiveness}
+        onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
+        title="How aggressively long label text wraps in copied diagram images"
+        aria-label="Label wrap aggressiveness"
+      >
+        <option value="compact">Wrap: Compact</option>
+        <option value="normal">Wrap: Normal</option>
+        <option value="wide">Wrap: Wide</option>
       </select>
     </div>
   );

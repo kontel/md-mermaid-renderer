@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import type { LabelWrapAggressiveness } from '../utils/copyPreview';
 
 export type MermaidRenderMode = 'default' | 'beautiful-svg' | 'beautiful-ascii';
 
@@ -51,6 +52,7 @@ const DEFAULT_THEME_CONFIG: ThemeConfig = {
 
 const RENDER_MODE_STORAGE_KEY = 'md-mermaid-render-mode';
 const THEME_CONFIG_STORAGE_KEY = 'md-mermaid-theme-config';
+const LABEL_WRAP_STORAGE_KEY = 'md-mermaid-label-wrap';
 
 interface MermaidContextType {
   renderMode: MermaidRenderMode;
@@ -59,12 +61,18 @@ interface MermaidContextType {
   setThemeConfig: (config: ThemeConfig) => void;
   isDrawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
+  labelWrapAggressiveness: LabelWrapAggressiveness;
+  setLabelWrapAggressiveness: (mode: LabelWrapAggressiveness) => void;
 }
 
 const MermaidContext = createContext<MermaidContextType | undefined>(undefined);
 
 function isValidRenderMode(value: string | null): value is MermaidRenderMode {
   return value === 'default' || value === 'beautiful-svg' || value === 'beautiful-ascii';
+}
+
+function isValidLabelWrap(value: string | null): value is LabelWrapAggressiveness {
+  return value === 'compact' || value === 'normal' || value === 'wide';
 }
 
 function loadThemeConfig(): ThemeConfig {
@@ -88,10 +96,18 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
 
   const [themeConfig, setThemeConfig] = useState<ThemeConfig>(loadThemeConfig);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [labelWrapAggressiveness, setLabelWrapAggressiveness] = useState<LabelWrapAggressiveness>(() => {
+    const stored = localStorage.getItem(LABEL_WRAP_STORAGE_KEY);
+    return isValidLabelWrap(stored) ? stored : 'normal';
+  });
 
   useEffect(() => {
     localStorage.setItem(RENDER_MODE_STORAGE_KEY, renderMode);
   }, [renderMode]);
+
+  useEffect(() => {
+    localStorage.setItem(LABEL_WRAP_STORAGE_KEY, labelWrapAggressiveness);
+  }, [labelWrapAggressiveness]);
 
   useEffect(() => {
     localStorage.setItem(THEME_CONFIG_STORAGE_KEY, JSON.stringify(themeConfig));
@@ -104,7 +120,9 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
       themeConfig,
       setThemeConfig,
       isDrawerOpen,
-      setDrawerOpen
+      setDrawerOpen,
+      labelWrapAggressiveness,
+      setLabelWrapAggressiveness,
     }}>
       {children}
     </MermaidContext.Provider>

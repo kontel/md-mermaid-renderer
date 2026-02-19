@@ -2,6 +2,7 @@ import html2canvas from 'html2canvas';
 import { FLOWCHART_PADDING } from '../config/flowchart';
 
 export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
+export type LabelWrapAggressiveness = 'compact' | 'normal' | 'wide';
 
 /** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
 const MAX_PNG_WIDTH = 600;
@@ -108,9 +109,21 @@ function wrapSingleLineByWords(line: string, maxCharsPerLine: number): string[] 
   return result;
 }
 
-function autoWrapLinesByBoxWidth(lines: string[], boxWidthPx: number, fontSizePx: number): string[] {
+function autoWrapLinesByBoxWidth(
+  lines: string[],
+  boxWidthPx: number,
+  fontSizePx: number,
+  wrapAggressiveness: LabelWrapAggressiveness,
+): string[] {
+  const multiplierByMode: Record<LabelWrapAggressiveness, number> = {
+    compact: 0.85,
+    // Slightly more relaxed default than previous behavior.
+    normal: 1.15,
+    wide: 1.35,
+  };
   const avgCharWidth = Math.max(5, fontSizePx * 0.56);
-  const maxCharsPerLine = Math.max(12, Math.floor((boxWidthPx - 12) / avgCharWidth));
+  const baseChars = Math.max(12, Math.floor((boxWidthPx - 12) / avgCharWidth));
+  const maxCharsPerLine = Math.max(12, Math.floor(baseChars * multiplierByMode[wrapAggressiveness]));
 
   if (maxCharsPerLine >= 80) return lines;
 
@@ -147,7 +160,10 @@ function applyInlineStyles(root: HTMLElement) {
 // Strategy 1: SVG → Image → Canvas (fast, but foreignObject causes taint)
 // ---------------------------------------------------------------------------
 
-function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
+function svgToPngDataUri(
+  svgEl: SVGSVGElement,
+  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+): Promise<string> {
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(svgEl);
 
@@ -189,7 +205,7 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
       if (lines.length === 0) return '';
 
       const estimatedFontSize = Math.max(12, Math.min(17, (h / Math.max(1, lines.length)) * 0.52));
-      lines = autoWrapLinesByBoxWidth(lines, w, estimatedFontSize);
+      lines = autoWrapLinesByBoxWidth(lines, w, estimatedFontSize, wrapAggressiveness);
       if (lines.length === 0) return '';
 
       const cx = x + w / 2;
@@ -322,6 +338,7 @@ async function convertContainer(
   liveContainer: HTMLElement,
   cloneContainer: HTMLElement,
   strategy: CopyStrategy,
+  wrapAggressiveness: LabelWrapAggressiveness,
 ) {
   const liveSvg = liveContainer.querySelector<SVGSVGElement>(':scope > svg');
 
@@ -333,7 +350,7 @@ async function convertContainer(
 
   if (strategy === 'svg-pipeline') {
     if (!liveSvg) return;
-    const png = await svgToPngDataUri(liveSvg);
+    const png = await svgToPngDataUri(liveSvg, wrapAggressiveness);
     replaceContainerWithImg(cloneContainer, png);
     return;
   }
@@ -341,7 +358,7 @@ async function convertContainer(
   // "auto": try SVG pipeline first, fall back to DOM capture
   if (liveSvg) {
     try {
-      const png = await svgToPngDataUri(liveSvg);
+      const png = await svgToPngDataUri(liveSvg, wrapAggressiveness);
       replaceContainerWithImg(cloneContainer, png);
       return;
     } catch {
@@ -358,11 +375,14 @@ async function convertContainer(
 }
 
 /** One diagram container → PNG data URI (SVG path then DOM fallback). */
-export async function diagramToPngDataUri(container: HTMLElement): Promise<string> {
+export async function diagramToPngDataUri(
+  container: HTMLElement,
+  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+): Promise<string> {
   const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
   if (svgEl) {
     try {
-      return await svgToPngDataUri(svgEl);
+      return await svgToPngDataUri(svgEl, wrapAggressiveness);
     } catch {
       // fall through to DOM
     }
@@ -380,15 +400,22 @@ function dataUriToBlob(dataUri: string): Blob {
 }
 
 /** Copy one diagram as PNG to clipboard. */
-export async function copyDiagramToClipboard(container: HTMLElement): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container);
+export async function copyDiagramToClipboard(
+  container: HTMLElement,
+  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+): Promise<void> {
+  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness);
   const blob = dataUriToBlob(dataUri);
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }
 
 /** Save one diagram as PNG file. */
-export async function saveDiagramAsFile(container: HTMLElement, filename = 'diagram.png'): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container);
+export async function saveDiagramAsFile(
+  container: HTMLElement,
+  filename = 'diagram.png',
+  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+): Promise<void> {
+  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness);
   const blob = dataUriToBlob(dataUri);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -407,6 +434,7 @@ export async function saveDiagramAsFile(container: HTMLElement, filename = 'diag
 export async function copyPreview(
   previewEl: HTMLElement,
   strategy: CopyStrategy = 'auto',
+  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
 ): Promise<void> {
   const clone = previewEl.cloneNode(true) as HTMLElement;
 
@@ -416,7 +444,7 @@ export async function copyPreview(
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
   for (let i = 0; i < liveContainers.length; i++) {
-    await convertContainer(liveContainers[i], cloneContainers[i], strategy);
+    await convertContainer(liveContainers[i], cloneContainers[i], strategy, wrapAggressiveness);
   }
 
   applyInlineStyles(clone);

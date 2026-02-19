@@ -40,29 +40,30 @@ function buildThemeOptions(config: ThemeConfig) {
 }
 
 function DiagramActions({ containerRef }: { containerRef: React.RefObject<HTMLElement | null> }) {
+  const { labelWrapAggressiveness } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'saved'>('idle');
 
   const onCopy = useCallback(async () => {
     if (!containerRef.current) return;
     try {
-      await copyDiagramToClipboard(containerRef.current);
+      await copyDiagramToClipboard(containerRef.current, labelWrapAggressiveness);
       setStatus('copied');
       setTimeout(() => setStatus('idle'), 2000);
     } catch {
       setStatus('idle');
     }
-  }, [containerRef]);
+  }, [containerRef, labelWrapAggressiveness]);
 
   const onSave = useCallback(async () => {
     if (!containerRef.current) return;
     try {
-      await saveDiagramAsFile(containerRef.current);
+      await saveDiagramAsFile(containerRef.current, 'diagram.png', labelWrapAggressiveness);
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2000);
     } catch {
       setStatus('idle');
     }
-  }, [containerRef]);
+  }, [containerRef, labelWrapAggressiveness]);
 
   return (
     <div className="diagram-actions">
