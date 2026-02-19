@@ -82,6 +82,49 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;|&apos;/gi, "'");
 }
 
+function wrapSingleLineByWords(line: string, maxCharsPerLine: number): string[] {
+  const words = line.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  const result: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    if (!current) {
+      current = word;
+      continue;
+    }
+
+    if ((current.length + 1 + word.length) <= maxCharsPerLine) {
+      current += ` ${word}`;
+      continue;
+    }
+
+    result.push(current);
+    current = word;
+  }
+
+  if (current) result.push(current);
+  return result;
+}
+
+function autoWrapLinesByBoxWidth(lines: string[], boxWidthPx: number, fontSizePx: number): string[] {
+  const avgCharWidth = Math.max(5, fontSizePx * 0.56);
+  const maxCharsPerLine = Math.max(12, Math.floor((boxWidthPx - 12) / avgCharWidth));
+
+  if (maxCharsPerLine >= 80) return lines;
+
+  const wrapped: string[] = [];
+  for (const line of lines) {
+    if (line.length <= maxCharsPerLine) {
+      wrapped.push(line);
+      continue;
+    }
+    wrapped.push(...wrapSingleLineByWords(line, maxCharsPerLine));
+  }
+  return wrapped;
+}
+
 function applyInlineStyles(root: HTMLElement) {
   for (const [selector, styles] of Object.entries(INLINE_STYLES)) {
     const elements = selector === '.markdown-body'
@@ -128,22 +171,26 @@ function svgToPngDataUri(svgEl: SVGSVGElement): Promise<string> {
   svgString = svgString.replace(
     /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
     (_match: string, attrs: string, inner: string, offset: number, fullString: string) => {
+      const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const w = parseFloat((/\bwidth="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const h = parseFloat((/\bheight="([^"]*)"/.exec(attrs))?.[1] || '0');
+
       const withNewlines = inner
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<[^>]*>/g, '')
         .trim();
       if (!withNewlines) return '';
 
-      const lines = withNewlines
+      let lines = withNewlines
         .split(/\n/)
         .map((s) => decodeHtmlEntities(s.trim()))
         .filter(Boolean);
       if (lines.length === 0) return '';
 
-      const x = parseFloat((/\bx="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const y = parseFloat((/\by="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const w = parseFloat((/\bwidth="([^"]*)"/.exec(attrs))?.[1] || '0');
-      const h = parseFloat((/\bheight="([^"]*)"/.exec(attrs))?.[1] || '0');
+      const estimatedFontSize = Math.max(12, Math.min(17, (h / Math.max(1, lines.length)) * 0.52));
+      lines = autoWrapLinesByBoxWidth(lines, w, estimatedFontSize);
+      if (lines.length === 0) return '';
 
       const cx = x + w / 2;
       const cy = y + h / 2;

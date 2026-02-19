@@ -29,12 +29,12 @@ flowchart TD
     subgraph init["Setup & initialization<br/>of core services"]
         A[Start]
     end
-    subgraph check["Check<br/>status"]
+    subgraph check["Check very long status text without line breaks"]
         B{Is it working?<br/>test}
     end
     subgraph actions["Actions<br/>& results"]
         C[Great!]
-        D[Debug]
+        D[Debug with long text without line breaks]
     end
     subgraph done["Finish"]
         E[End]
