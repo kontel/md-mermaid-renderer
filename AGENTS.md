@@ -42,7 +42,8 @@ Uses react-markdown with:
 ```bash
 pnpm install    # Install dependencies
 pnpm dev        # Start dev server
-pnpm build      # Production build
+pnpm build      # Production build (Vite only)
+pnpm typecheck  # Type-check (tsc -b)
 pnpm preview    # Preview production build
 ```
 

@@ -1,22 +1,5 @@
+import { THEMES } from 'beautiful-mermaid';
 import { useMermaidContext, type ThemeConfig, type ThemePreset } from '../context/MermaidContext';
-
-const PRESET_THEME_VALUES: Record<string, { bg: string; fg: string; line?: string; accent?: string; muted?: string; surface?: string; border?: string }> = {
-  'zinc-light': { bg: '#fafafa', fg: '#18181b', line: '#a1a1aa', accent: '#3f3f46', muted: '#71717a', surface: '#f4f4f5', border: '#d4d4d8' },
-  'tokyo-night-light': { bg: '#d5d6db', fg: '#343b58', line: '#9699a3', accent: '#34548a', muted: '#9699a3', surface: '#d5d6db', border: '#9699a3' },
-  'catppuccin-latte': { bg: '#eff1f5', fg: '#4c4f69', line: '#9ca0b0', accent: '#1e66f5', muted: '#9ca0b0', surface: '#e6e9ef', border: '#bcc0cc' },
-  'nord-light': { bg: '#eceff4', fg: '#2e3440', line: '#d8dee9', accent: '#5e81ac', muted: '#4c566a', surface: '#e5e9f0', border: '#d8dee9' },
-  'github-light': { bg: '#ffffff', fg: '#24292f', line: '#d0d7de', accent: '#0969da', muted: '#57606a', surface: '#f6f8fa', border: '#d0d7de' },
-  'solarized-light': { bg: '#fdf6e3', fg: '#657b83', line: '#93a1a1', accent: '#268bd2', muted: '#93a1a1', surface: '#eee8d5', border: '#93a1a1' },
-  'zinc-dark': { bg: '#18181b', fg: '#fafafa', line: '#52525b', accent: '#a1a1aa', muted: '#71717a', surface: '#27272a', border: '#3f3f46' },
-  'tokyo-night': { bg: '#1a1b26', fg: '#a9b1d6', line: '#565f89', accent: '#7aa2f7', muted: '#565f89', surface: '#24283b', border: '#414868' },
-  'tokyo-night-storm': { bg: '#24283b', fg: '#a9b1d6', line: '#565f89', accent: '#7aa2f7', muted: '#565f89', surface: '#1f2335', border: '#414868' },
-  'catppuccin-mocha': { bg: '#1e1e2e', fg: '#cdd6f4', line: '#6c7086', accent: '#89b4fa', muted: '#6c7086', surface: '#313244', border: '#45475a' },
-  'nord': { bg: '#2e3440', fg: '#eceff4', line: '#4c566a', accent: '#88c0d0', muted: '#4c566a', surface: '#3b4252', border: '#4c566a' },
-  'dracula': { bg: '#282a36', fg: '#f8f8f2', line: '#6272a4', accent: '#bd93f9', muted: '#6272a4', surface: '#44475a', border: '#6272a4' },
-  'github-dark': { bg: '#0d1117', fg: '#c9d1d9', line: '#30363d', accent: '#58a6ff', muted: '#8b949e', surface: '#161b22', border: '#30363d' },
-  'solarized-dark': { bg: '#002b36', fg: '#839496', line: '#586e75', accent: '#268bd2', muted: '#586e75', surface: '#073642', border: '#586e75' },
-  'one-dark': { bg: '#282c34', fg: '#abb2bf', line: '#5c6370', accent: '#61afef', muted: '#5c6370', surface: '#21252b', border: '#3e4451' },
-};
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Fira Code', 'JetBrains Mono', 'system-ui', 'monospace'];
 
@@ -89,7 +72,7 @@ export function ThemeDrawer() {
     if (preset === 'custom') {
       setThemeConfig({ ...themeConfig, preset: 'custom' });
     } else {
-      const presetValues = PRESET_THEME_VALUES[preset];
+      const presetValues = THEMES[preset as keyof typeof THEMES];
       if (presetValues) {
         setThemeConfig({
           ...themeConfig,

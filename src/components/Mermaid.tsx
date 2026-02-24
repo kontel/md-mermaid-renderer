@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { renderMermaid, renderMermaidAscii } from 'beautiful-mermaid';
+import { renderMermaidSVG, renderMermaidASCII } from 'beautiful-mermaid';
 import { flowchartConfig } from '../config/flowchart';
 import { useMermaidContext } from '../context/MermaidContext';
-import type { ThemeConfig } from '../context/MermaidContext';
+import type { MermaidRenderMode, ThemeConfig } from '../context/MermaidContext';
 import { copyDiagramToClipboard, saveDiagramAsFile } from '../utils/copyPreview';
 
 interface MermaidProps {
@@ -79,51 +79,75 @@ function DiagramActions({ containerRef }: { containerRef: React.RefObject<HTMLEl
   );
 }
 
+function useBeautifulRender(chart: string, themeConfig: ThemeConfig, renderMode: MermaidRenderMode) {
+  return useMemo(() => {
+    if (renderMode === 'default' || !chart.trim()) return { svg: '', ascii: '', error: null as string | null };
+    try {
+      const themeOptions = buildThemeOptions(themeConfig);
+      if (renderMode === 'beautiful-svg') {
+        const svgResult = renderMermaidSVG(chart, themeOptions);
+        return { svg: svgResult, ascii: '', error: null };
+      }
+      const asciiTheme: Record<string, string | undefined> = {
+        fg: themeConfig.fg,
+        border: themeConfig.border ?? themeConfig.line,
+        line: themeConfig.line ?? themeConfig.muted,
+        arrow: themeConfig.accent,
+        corner: themeConfig.line ?? themeConfig.muted,
+        junction: themeConfig.border ?? themeConfig.line,
+      };
+      const asciiResult = renderMermaidASCII(chart, { theme: asciiTheme, colorMode: 'html' });
+      return { svg: '', ascii: asciiResult, error: null };
+    } catch (err) {
+      return {
+        svg: '',
+        ascii: '',
+        error: err instanceof Error ? err.message : 'Failed to render diagram',
+      };
+    }
+  }, [chart, themeConfig, renderMode]);
+}
+
 export function Mermaid({ chart }: MermaidProps) {
   const { renderMode, themeConfig } = useMermaidContext();
   const containerRef = useRef<HTMLElement>(null);
-  const [svg, setSvg] = useState<string>('');
-  const [ascii, setAscii] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [defaultSvg, setDefaultSvg] = useState<string>('');
+  const [defaultError, setDefaultError] = useState<string | null>(null);
+
+  const beautiful = useBeautifulRender(chart, themeConfig, renderMode);
 
   useEffect(() => {
-    const renderChart = async () => {
-      if (!chart.trim()) {
-        setSvg('');
-        setAscii('');
-        setError(null);
-        return;
-      }
-
+    if (renderMode !== 'default') return;
+    if (!chart.trim()) {
+      setDefaultSvg('');
+      setDefaultError(null);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
       try {
-        if (renderMode === 'default') {
-          const id = nextMermaidId();
-          const { svg } = await mermaid.render(id, chart);
-          setSvg(svg);
-          setAscii('');
-          setError(null);
-        } else if (renderMode === 'beautiful-svg') {
-          const themeOptions = buildThemeOptions(themeConfig);
-          const svgResult = await renderMermaid(chart, themeOptions);
-          setSvg(svgResult);
-          setAscii('');
-          setError(null);
-        } else if (renderMode === 'beautiful-ascii') {
-          const themeOptions = buildThemeOptions(themeConfig);
-          const asciiResult = renderMermaidAscii(chart, themeOptions);
-          setAscii(asciiResult);
-          setSvg('');
-          setError(null);
+        const id = nextMermaidId();
+        const { svg } = await mermaid.render(id, chart);
+        if (!cancelled) {
+          setDefaultSvg(svg);
+          setDefaultError(null);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to render diagram');
-        setSvg('');
-        setAscii('');
+        if (!cancelled) {
+          setDefaultError(err instanceof Error ? err.message : 'Failed to render diagram');
+          setDefaultSvg('');
+        }
       }
     };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [chart, renderMode]);
 
-    renderChart();
-  }, [chart, renderMode, themeConfig]);
+  const svg = renderMode === 'default' ? defaultSvg : beautiful.svg;
+  const ascii = beautiful.ascii;
+  const error = renderMode === 'default' ? defaultError : beautiful.error;
 
   if (error) {
     return (
