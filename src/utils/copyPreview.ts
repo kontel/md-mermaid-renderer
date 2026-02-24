@@ -16,15 +16,15 @@ const COPY_IMAGE_FONT_SCALE: Record<CopyImageFontSize, number> = {
 /** Base font size (px) for "normal" in exported diagram images; Small/Large scale this. */
 const COPY_IMAGE_BASE_FONT_PX = 14;
 
-/** Export width range (CSS pixels). Small diagrams scale down to min; large cap at max. */
-const MIN_PNG_WIDTH = 240;
-const MAX_PNG_WIDTH = 600;
+/** Export width range (CSS pixels). Small diagrams scale down to min; large cap at max. Exported for tests. */
+export const MIN_PNG_WIDTH = 240;
+export const MAX_PNG_WIDTH = 600;
 
 /**
  * Target export width from intrinsic diagram size so small diagrams (e.g. class) export smaller
  * and large ones (e.g. sequence) stay readable but capped.
  */
-function targetExportWidth(intrinsicWidth: number): number {
+export function targetExportWidth(intrinsicWidth: number): number {
   if (intrinsicWidth <= 0) return MIN_PNG_WIDTH;
   if (intrinsicWidth < 380) {
     return Math.max(MIN_PNG_WIDTH, Math.round(intrinsicWidth * 0.72));
@@ -92,7 +92,7 @@ const INLINE_STYLES: Record<string, Record<string, string>> = {
   },
 };
 
-function escapeXml(unsafe: string): string {
+export function escapeXml(unsafe: string): string {
   return unsafe
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -101,8 +101,8 @@ function escapeXml(unsafe: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/** Decode HTML entities so "Setup &amp; init" becomes "Setup & init" before we re-escape for SVG. */
-function decodeHtmlEntities(text: string): string {
+/** Decode HTML entities so "Setup &amp; init" becomes "Setup & init" before we re-escape for SVG. Exported for tests. */
+export function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
@@ -111,7 +111,8 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;|&apos;/gi, "'");
 }
 
-function wrapSingleLineByWords(line: string, maxCharsPerLine: number): string[] {
+/** Wrap a single line by words to fit max chars per line. Exported for tests. */
+export function wrapSingleLineByWords(line: string, maxCharsPerLine: number): string[] {
   const words = line.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 

@@ -1,59 +1,20 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { CopyImageFontSize, LabelWrapAggressiveness } from '../utils/copyPreview';
+import {
+  RENDER_MODE_STORAGE_KEY,
+  THEME_CONFIG_STORAGE_KEY,
+  LABEL_WRAP_STORAGE_KEY,
+  COPY_IMAGE_FONT_SIZE_STORAGE_KEY,
+  isValidRenderMode,
+  isValidLabelWrap,
+  isValidCopyImageFontSize,
+  loadThemeConfig,
+} from './mermaidStorage';
+import type { MermaidRenderMode, ThemeConfig } from './themeConfig';
 
-export type MermaidRenderMode = 'default' | 'beautiful-svg' | 'beautiful-ascii';
-
-export const THEME_PRESETS = [
-  'zinc-light',
-  'tokyo-night-light',
-  'catppuccin-latte',
-  'nord-light',
-  'github-light',
-  'solarized-light',
-  'zinc-dark',
-  'tokyo-night',
-  'tokyo-night-storm',
-  'catppuccin-mocha',
-  'nord',
-  'dracula',
-  'github-dark',
-  'solarized-dark',
-  'one-dark',
-] as const;
-
-export type ThemePreset = typeof THEME_PRESETS[number] | 'custom';
-
-export interface ThemeConfig {
-  preset: ThemePreset;
-  bg: string;
-  fg: string;
-  line?: string;
-  accent?: string;
-  muted?: string;
-  surface?: string;
-  border?: string;
-  font?: string;
-  transparent?: boolean;
-}
-
-const DEFAULT_THEME_CONFIG: ThemeConfig = {
-  preset: 'custom',
-  bg: '#1a1b26',
-  fg: '#a9b1d6',
-  line: '#565f89',
-  accent: '#7aa2f7',
-  muted: '#565f89',
-  surface: '#24283b',
-  border: '#414868',
-  font: 'Inter',
-  transparent: false,
-};
-
-const RENDER_MODE_STORAGE_KEY = 'md-mermaid-render-mode';
-const THEME_CONFIG_STORAGE_KEY = 'md-mermaid-theme-config';
-const LABEL_WRAP_STORAGE_KEY = 'md-mermaid-label-wrap';
-const COPY_IMAGE_FONT_SIZE_STORAGE_KEY = 'md-mermaid-copy-image-font-size';
+export type { MermaidRenderMode, ThemePreset, ThemeConfig } from './themeConfig';
+export { THEME_PRESETS } from './themeConfig';
 
 interface MermaidContextType {
   renderMode: MermaidRenderMode;
@@ -69,31 +30,6 @@ interface MermaidContextType {
 }
 
 const MermaidContext = createContext<MermaidContextType | undefined>(undefined);
-
-function isValidRenderMode(value: string | null): value is MermaidRenderMode {
-  return value === 'default' || value === 'beautiful-svg' || value === 'beautiful-ascii';
-}
-
-function isValidLabelWrap(value: string | null): value is LabelWrapAggressiveness {
-  return value === 'compact' || value === 'normal' || value === 'wide';
-}
-
-function isValidCopyImageFontSize(value: string | null): value is CopyImageFontSize {
-  return value === 'small' || value === 'normal' || value === 'large';
-}
-
-function loadThemeConfig(): ThemeConfig {
-  try {
-    const stored = localStorage.getItem(THEME_CONFIG_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...DEFAULT_THEME_CONFIG, ...parsed };
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return DEFAULT_THEME_CONFIG;
-}
 
 export function MermaidProvider({ children }: { children: ReactNode }) {
   const [renderMode, setRenderMode] = useState<MermaidRenderMode>(() => {
@@ -129,18 +65,20 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
   }, [themeConfig]);
 
   return (
-    <MermaidContext.Provider value={{
-      renderMode,
-      setRenderMode,
-      themeConfig,
-      setThemeConfig,
-      isDrawerOpen,
-      setDrawerOpen,
-      labelWrapAggressiveness,
-      setLabelWrapAggressiveness,
-      copyImageFontSize,
-      setCopyImageFontSize,
-    }}>
+    <MermaidContext.Provider
+      value={{
+        renderMode,
+        setRenderMode,
+        themeConfig,
+        setThemeConfig,
+        isDrawerOpen,
+        setDrawerOpen,
+        labelWrapAggressiveness,
+        setLabelWrapAggressiveness,
+        copyImageFontSize,
+        setCopyImageFontSize,
+      }}
+    >
       {children}
     </MermaidContext.Provider>
   );

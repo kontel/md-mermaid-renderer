@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { isMermaidBlock, parseCodeBlock } from '../lib/markdownCodeBlock';
 import { Mermaid } from './Mermaid';
 import type { Components } from 'react-markdown';
 
@@ -11,16 +12,11 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const components: Components = {
     code({ className, children, ...props }) {
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
-      const codeContent = String(children).replace(/\n$/, '');
+      const { language, codeContent, isInline } = parseCodeBlock(className, children);
 
-      if (language === 'mermaid') {
+      if (isMermaidBlock({ language, codeContent, isInline })) {
         return <Mermaid chart={codeContent} />;
       }
-
-      // Check if this is an inline code block
-      const isInline = !className && !codeContent.includes('\n');
 
       if (isInline) {
         return (
