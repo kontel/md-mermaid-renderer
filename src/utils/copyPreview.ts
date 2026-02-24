@@ -8,16 +8,32 @@ export type LabelWrapAggressiveness = 'compact' | 'normal' | 'wide';
 export type CopyImageFontSize = 'small' | 'normal' | 'large';
 
 const COPY_IMAGE_FONT_SCALE: Record<CopyImageFontSize, number> = {
-  small: 0.85,
-  normal: 1.05,
-  large: 1.28,
+  small: 0.95,
+  normal: 1.15,
+  large: 1.30,
 };
 
 /** Base font size (px) for "normal" in exported diagram images; Small/Large scale this. */
 const COPY_IMAGE_BASE_FONT_PX = 14;
 
-/** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
+/** Export width range (CSS pixels). Small diagrams scale down to min; large cap at max. */
+const MIN_PNG_WIDTH = 240;
 const MAX_PNG_WIDTH = 600;
+
+/**
+ * Target export width from intrinsic diagram size so small diagrams (e.g. class) export smaller
+ * and large ones (e.g. sequence) stay readable but capped.
+ */
+function targetExportWidth(intrinsicWidth: number): number {
+  if (intrinsicWidth <= 0) return MIN_PNG_WIDTH;
+  if (intrinsicWidth < 380) {
+    return Math.max(MIN_PNG_WIDTH, Math.round(intrinsicWidth * 0.72));
+  }
+  if (intrinsicWidth <= MAX_PNG_WIDTH) {
+    return Math.round(intrinsicWidth * 0.88);
+  }
+  return MAX_PNG_WIDTH;
+}
 
 const INLINE_STYLES: Record<string, Record<string, string>> = {
   '.markdown-body': {
@@ -182,14 +198,11 @@ function svgToPngDataUri(
   let svgString = serializer.serializeToString(svgEl);
 
   const bbox = svgEl.getBoundingClientRect();
-  let width = bbox.width || svgEl.viewBox?.baseVal?.width || 800;
-  let height = bbox.height || svgEl.viewBox?.baseVal?.height || 600;
+  const intrinsicWidth = bbox.width || svgEl.viewBox?.baseVal?.width || 800;
+  const intrinsicHeight = bbox.height || svgEl.viewBox?.baseVal?.height || 600;
 
-  // Clamp to max width, scaling height proportionally
-  if (width > MAX_PNG_WIDTH) {
-    height = height * (MAX_PNG_WIDTH / width);
-    width = MAX_PNG_WIDTH;
-  }
+  const width = targetExportWidth(intrinsicWidth);
+  const height = intrinsicHeight * (width / intrinsicWidth);
 
   if (!svgString.includes('xmlns=')) {
     svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -324,8 +337,8 @@ function svgToPngDataUri(
 async function domToPngDataUri(el: HTMLElement): Promise<string> {
   const rect = el.getBoundingClientRect();
   const elWidth = rect.width || MAX_PNG_WIDTH;
-  // Scale down if the element is wider than the cap
-  const scale = elWidth > MAX_PNG_WIDTH ? (MAX_PNG_WIDTH / elWidth) * 2 : 2;
+  const targetW = targetExportWidth(elWidth);
+  const scale = (targetW / elWidth) * 2;
 
   const canvas = await html2canvas(el, {
     backgroundColor: '#ffffff',
