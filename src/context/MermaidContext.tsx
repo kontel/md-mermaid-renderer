@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { LabelWrapAggressiveness } from '../utils/copyPreview';
+import type { CopyImageFontSize, LabelWrapAggressiveness } from '../utils/copyPreview';
 
 export type MermaidRenderMode = 'default' | 'beautiful-svg' | 'beautiful-ascii';
 
@@ -53,6 +53,7 @@ const DEFAULT_THEME_CONFIG: ThemeConfig = {
 const RENDER_MODE_STORAGE_KEY = 'md-mermaid-render-mode';
 const THEME_CONFIG_STORAGE_KEY = 'md-mermaid-theme-config';
 const LABEL_WRAP_STORAGE_KEY = 'md-mermaid-label-wrap';
+const COPY_IMAGE_FONT_SIZE_STORAGE_KEY = 'md-mermaid-copy-image-font-size';
 
 interface MermaidContextType {
   renderMode: MermaidRenderMode;
@@ -63,6 +64,8 @@ interface MermaidContextType {
   setDrawerOpen: (open: boolean) => void;
   labelWrapAggressiveness: LabelWrapAggressiveness;
   setLabelWrapAggressiveness: (mode: LabelWrapAggressiveness) => void;
+  copyImageFontSize: CopyImageFontSize;
+  setCopyImageFontSize: (size: CopyImageFontSize) => void;
 }
 
 const MermaidContext = createContext<MermaidContextType | undefined>(undefined);
@@ -73,6 +76,10 @@ function isValidRenderMode(value: string | null): value is MermaidRenderMode {
 
 function isValidLabelWrap(value: string | null): value is LabelWrapAggressiveness {
   return value === 'compact' || value === 'normal' || value === 'wide';
+}
+
+function isValidCopyImageFontSize(value: string | null): value is CopyImageFontSize {
+  return value === 'small' || value === 'normal' || value === 'large';
 }
 
 function loadThemeConfig(): ThemeConfig {
@@ -100,6 +107,10 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem(LABEL_WRAP_STORAGE_KEY);
     return isValidLabelWrap(stored) ? stored : 'normal';
   });
+  const [copyImageFontSize, setCopyImageFontSize] = useState<CopyImageFontSize>(() => {
+    const stored = localStorage.getItem(COPY_IMAGE_FONT_SIZE_STORAGE_KEY);
+    return isValidCopyImageFontSize(stored) ? stored : 'normal';
+  });
 
   useEffect(() => {
     localStorage.setItem(RENDER_MODE_STORAGE_KEY, renderMode);
@@ -108,6 +119,10 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(LABEL_WRAP_STORAGE_KEY, labelWrapAggressiveness);
   }, [labelWrapAggressiveness]);
+
+  useEffect(() => {
+    localStorage.setItem(COPY_IMAGE_FONT_SIZE_STORAGE_KEY, copyImageFontSize);
+  }, [copyImageFontSize]);
 
   useEffect(() => {
     localStorage.setItem(THEME_CONFIG_STORAGE_KEY, JSON.stringify(themeConfig));
@@ -123,6 +138,8 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
       setDrawerOpen,
       labelWrapAggressiveness,
       setLabelWrapAggressiveness,
+      copyImageFontSize,
+      setCopyImageFontSize,
     }}>
       {children}
     </MermaidContext.Provider>

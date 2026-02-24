@@ -4,7 +4,7 @@ import { ThemeDrawer } from './components/ThemeDrawer';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
-import type { CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
+import type { CopyImageFontSize, CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -134,14 +134,19 @@ function RenderModeSelector() {
 }
 
 function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
-  const { labelWrapAggressiveness, setLabelWrapAggressiveness } = useMermaidContext();
+  const {
+    labelWrapAggressiveness,
+    setLabelWrapAggressiveness,
+    copyImageFontSize,
+    setCopyImageFontSize,
+  } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
     try {
-      await copyPreview(previewRef.current, strategy, labelWrapAggressiveness);
+      await copyPreview(previewRef.current, strategy, labelWrapAggressiveness, copyImageFontSize);
       setStatus('copied');
     } catch {
       setStatus('failed');
@@ -181,6 +186,17 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
         <option value="compact">Wrap: Compact</option>
         <option value="normal">Wrap: Normal</option>
         <option value="wide">Wrap: Wide</option>
+      </select>
+      <select
+        className="copy-strategy-select"
+        value={copyImageFontSize}
+        onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
+        title="Font size of text in copied/saved diagram images"
+        aria-label="Copy image font size"
+      >
+        <option value="small">Font: Small</option>
+        <option value="normal">Font: Normal</option>
+        <option value="large">Font: Large</option>
       </select>
     </div>
   );

@@ -4,6 +4,18 @@ import { FLOWCHART_PADDING } from '../config/flowchart';
 export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
 export type LabelWrapAggressiveness = 'compact' | 'normal' | 'wide';
 
+/** Font size scale when copying/saving diagram images. */
+export type CopyImageFontSize = 'small' | 'normal' | 'large';
+
+const COPY_IMAGE_FONT_SCALE: Record<CopyImageFontSize, number> = {
+  small: 0.85,
+  normal: 1.05,
+  large: 1.28,
+};
+
+/** Base font size (px) for "normal" in exported diagram images; Small/Large scale this. */
+const COPY_IMAGE_BASE_FONT_PX = 14;
+
 /** Max width (in CSS pixels, before retina scaling) for generated PNGs. */
 const MAX_PNG_WIDTH = 600;
 
@@ -163,7 +175,9 @@ function applyInlineStyles(root: HTMLElement) {
 function svgToPngDataUri(
   svgEl: SVGSVGElement,
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+  fontSize: CopyImageFontSize = 'normal',
 ): Promise<string> {
+  const fontScale = COPY_IMAGE_FONT_SCALE[fontSize];
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(svgEl);
 
@@ -181,9 +195,12 @@ function svgToPngDataUri(
     svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
   }
 
+  const normalizedFontPx = Math.round(COPY_IMAGE_BASE_FONT_PX * fontScale * 10) / 10;
+
   // Replace foreignObject with SVG text to avoid canvas taint.
   // Preserve line breaks from <br/>, <br>, <br /> so multi-line node labels render correctly.
   // Edge labels get a light gray rounded rect behind them (copy/paste only).
+  // Use normalizedFontPx for all injected text so sizes stay consistent.
   svgString = svgString.replace(
     /<foreignObject([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
     (_match: string, attrs: string, inner: string, offset: number, fullString: string) => {
@@ -204,16 +221,16 @@ function svgToPngDataUri(
         .filter(Boolean);
       if (lines.length === 0) return '';
 
-      const estimatedFontSize = Math.max(12, Math.min(17, (h / Math.max(1, lines.length)) * 0.52));
+      const baseFontSize = (h / Math.max(1, lines.length)) * 0.52;
+      const estimatedFontSize = Math.max(12, Math.min(17, baseFontSize));
       lines = autoWrapLinesByBoxWidth(lines, w, estimatedFontSize, wrapAggressiveness);
       if (lines.length === 0) return '';
 
       const cx = x + w / 2;
       const cy = y + h / 2;
-      const fontSize = Math.max(12, Math.min(17, (h / Math.max(1, lines.length)) * 0.52));
-      const lineHeight = fontSize * 1.2;
+      const lineHeight = normalizedFontPx * 1.2;
       const totalHeight = (lines.length - 1) * lineHeight;
-      const startY = cy - totalHeight / 2 + (fontSize * 0.35);
+      const startY = cy - totalHeight / 2 + (normalizedFontPx * 0.35);
 
       const tspans = lines
         .map(
@@ -222,7 +239,7 @@ function svgToPngDataUri(
         )
         .join('');
 
-      const textEl = `<text x="${cx}" y="${startY}" font-family="arial, sans-serif" font-size="${fontSize}">${tspans}</text>`;
+      const textEl = `<text x="${cx}" y="${startY}" font-family="arial, sans-serif" font-size="${normalizedFontPx}">${tspans}</text>`;
 
       // Detect edge labels only from a tight window around this foreignObject.
       // A broad scan can misclassify nearby node labels (notably the first node)
@@ -255,6 +272,12 @@ function svgToPngDataUri(
       const cleanedBody = body.replace(/<rect\b[^>]*\/>\s*|<rect\b[^>]*>\s*<\/rect>\s*/gi, '');
       return `${open}${cleanedBody}${close}`;
     },
+  );
+
+  // Normalize all font-size to the same scaled value so node labels, edge labels, and subgraph titles are consistent
+  svgString = svgString.replace(
+    /\bfont-size="(\d+(?:\.\d+)?)(px)?"/gi,
+    () => `font-size="${normalizedFontPx}"`,
   );
 
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -339,6 +362,7 @@ async function convertContainer(
   cloneContainer: HTMLElement,
   strategy: CopyStrategy,
   wrapAggressiveness: LabelWrapAggressiveness,
+  copyImageFontSize: CopyImageFontSize,
 ) {
   const liveSvg = liveContainer.querySelector<SVGSVGElement>(':scope > svg');
 
@@ -350,7 +374,7 @@ async function convertContainer(
 
   if (strategy === 'svg-pipeline') {
     if (!liveSvg) return;
-    const png = await svgToPngDataUri(liveSvg, wrapAggressiveness);
+    const png = await svgToPngDataUri(liveSvg, wrapAggressiveness, copyImageFontSize);
     replaceContainerWithImg(cloneContainer, png);
     return;
   }
@@ -358,7 +382,7 @@ async function convertContainer(
   // "auto": try SVG pipeline first, fall back to DOM capture
   if (liveSvg) {
     try {
-      const png = await svgToPngDataUri(liveSvg, wrapAggressiveness);
+      const png = await svgToPngDataUri(liveSvg, wrapAggressiveness, copyImageFontSize);
       replaceContainerWithImg(cloneContainer, png);
       return;
     } catch {
@@ -378,11 +402,12 @@ async function convertContainer(
 export async function diagramToPngDataUri(
   container: HTMLElement,
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+  copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<string> {
   const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
   if (svgEl) {
     try {
-      return await svgToPngDataUri(svgEl, wrapAggressiveness);
+      return await svgToPngDataUri(svgEl, wrapAggressiveness, copyImageFontSize);
     } catch {
       // fall through to DOM
     }
@@ -403,8 +428,9 @@ function dataUriToBlob(dataUri: string): Blob {
 export async function copyDiagramToClipboard(
   container: HTMLElement,
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+  copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness);
+  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness, copyImageFontSize);
   const blob = dataUriToBlob(dataUri);
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }
@@ -414,8 +440,9 @@ export async function saveDiagramAsFile(
   container: HTMLElement,
   filename = 'diagram.png',
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+  copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness);
+  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness, copyImageFontSize);
   const blob = dataUriToBlob(dataUri);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -435,6 +462,7 @@ export async function copyPreview(
   previewEl: HTMLElement,
   strategy: CopyStrategy = 'auto',
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
+  copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<void> {
   const clone = previewEl.cloneNode(true) as HTMLElement;
 
@@ -444,7 +472,7 @@ export async function copyPreview(
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
   for (let i = 0; i < liveContainers.length; i++) {
-    await convertContainer(liveContainers[i], cloneContainers[i], strategy, wrapAggressiveness);
+    await convertContainer(liveContainers[i], cloneContainers[i], strategy, wrapAggressiveness, copyImageFontSize);
   }
 
   applyInlineStyles(clone);

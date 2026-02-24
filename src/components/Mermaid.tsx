@@ -40,30 +40,30 @@ function buildThemeOptions(config: ThemeConfig) {
 }
 
 function DiagramActions({ containerRef }: { containerRef: React.RefObject<HTMLElement | null> }) {
-  const { labelWrapAggressiveness } = useMermaidContext();
+  const { labelWrapAggressiveness, copyImageFontSize } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'saved'>('idle');
 
   const onCopy = useCallback(async () => {
     if (!containerRef.current) return;
     try {
-      await copyDiagramToClipboard(containerRef.current, labelWrapAggressiveness);
+      await copyDiagramToClipboard(containerRef.current, labelWrapAggressiveness, copyImageFontSize);
       setStatus('copied');
       setTimeout(() => setStatus('idle'), 2000);
     } catch {
       setStatus('idle');
     }
-  }, [containerRef, labelWrapAggressiveness]);
+  }, [containerRef, labelWrapAggressiveness, copyImageFontSize]);
 
   const onSave = useCallback(async () => {
     if (!containerRef.current) return;
     try {
-      await saveDiagramAsFile(containerRef.current, 'diagram.png', labelWrapAggressiveness);
+      await saveDiagramAsFile(containerRef.current, 'diagram.png', labelWrapAggressiveness, copyImageFontSize);
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2000);
     } catch {
       setStatus('idle');
     }
-  }, [containerRef, labelWrapAggressiveness]);
+  }, [containerRef, labelWrapAggressiveness, copyImageFontSize]);
 
   return (
     <div className="diagram-actions">
@@ -119,8 +119,10 @@ export function Mermaid({ chart }: MermaidProps) {
   useEffect(() => {
     if (renderMode !== 'default') return;
     if (!chart.trim()) {
-      setDefaultSvg('');
-      setDefaultError(null);
+      queueMicrotask(() => {
+        setDefaultSvg('');
+        setDefaultError(null);
+      });
       return;
     }
     let cancelled = false;
