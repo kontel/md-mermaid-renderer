@@ -12,6 +12,120 @@ const STORAGE_KEY = 'md-mermaid-content';
 const AVATAR_SRC =
   import.meta.env.DEV ? '/kontel-avatar.png' : `${import.meta.env.BASE_URL}kontel-avatar.png`;
 
+function generateLargeFlow(): string {
+  const rows = 20;
+  const cols = 12;
+
+  const stages = [
+    'Ingest request',
+    'Parse headers',
+    'Authenticate JWT',
+    'Validate payload schema against strict contract v2',
+    'Rate limit?',
+    'Enrich with tenant + user context',
+    'Shard by tenant id',
+    'Queue for async worker',
+    'Transform',
+    'Apply rules engine?',
+    'Dedupe against recent window',
+    'Persist to primary datastore',
+    'Replicate cross-region asynchronously',
+    'Emit domain event',
+    'Invalidate caches',
+    'Notify downstream consumers via broker',
+    'Write audit trail with full request context',
+    'Collect metrics + distributed traces',
+    'Ack client',
+    'Archive',
+  ];
+
+  const lanes = [
+    'Payments',
+    'Notifications',
+    'Search index',
+    'Analytics ingest',
+    'Media transcode',
+    'Auth service',
+    'Inventory',
+    'Billing recon',
+    'Sync replication',
+    'Event bus',
+    'Cache warmer',
+    'Audit logger',
+  ];
+
+  const shapeOf = (r: number, label: string): string => {
+    const q = `"${label}"`;
+    if (r === 5 || r === 10) return `{${q}}`;
+    if (r === 12) return `[(${q})]`;
+    if (r === 7 || r === 16) return `[[${q}]]`;
+    if (r === 6 || r === 14) return `(${q})`;
+    return `[${q}]`;
+  };
+
+  const labelOf = (r: number, c: number): string => {
+    const stage = stages[r - 1];
+    const lane = lanes[c - 1];
+    const mix = (r * 31 + c * 17) % 13;
+    if (mix === 0) return `${lane} / ${stage} — extended notes about retries, idempotency and compensation`;
+    if (mix < 4) return `${lane} / ${stage}`;
+    if (mix < 7) return stage;
+    if (mix < 10) return `${lane} ${stage.toLowerCase()}`;
+    return lane;
+  };
+
+  const lines: string[] = ['flowchart TD'];
+
+  for (let r = 1; r <= rows; r++) {
+    for (let c = 1; c <= cols; c++) {
+      lines.push(`    N${r}_${c}${shapeOf(r, labelOf(r, c))}`);
+    }
+  }
+
+  for (let r = 1; r < rows; r++) {
+    for (let c = 1; c <= cols; c++) {
+      lines.push(`    N${r}_${c} --> N${r + 1}_${c}`);
+    }
+  }
+
+  for (const c of [1, 2, 7, 8, 11]) {
+    lines.push(`    N3_${c} -.->|verify| N4_6`);
+  }
+
+  for (const [c, target] of [[2, 1], [4, 3], [9, 8], [10, 9]] as const) {
+    lines.push(`    N5_${c} -->|reject| N6_${target}`);
+  }
+
+  for (const c of [1, 3, 5, 7, 9, 11]) {
+    lines.push(`    N7_${c} --> N8_${c + 1}`);
+  }
+
+  lines.push('    N10_3 -.->|retry| N7_3');
+  lines.push('    N10_8 -.->|retry| N7_8');
+
+  for (const c of [1, 3, 5, 7, 9]) {
+    lines.push(`    N12_${c} --> N13_12`);
+  }
+
+  for (let c = 1; c <= cols; c++) {
+    if (c === 3 || c === 11) continue;
+    const target = c % 2 === 0 ? 11 : 3;
+    lines.push(`    N14_${c} -.-> N15_${target}`);
+  }
+
+  for (const target of [2, 5, 6, 8, 9]) {
+    lines.push(`    N16_10 --> N17_${target}`);
+  }
+
+  for (let c = 1; c <= cols; c++) {
+    if (c !== 12) lines.push(`    N18_${c} -.-> N19_12`);
+  }
+
+  return lines.join('\n');
+}
+
+const largeFlowDiagram = generateLargeFlow();
+
 const defaultMarkdown = `# Markdown with Mermaid Demo
 
 This is a **markdown** renderer with support for *inline* Mermaid diagrams.
@@ -86,6 +200,12 @@ function greet(name) {
 | Markdown | ✅ |
 | Mermaid | ✅ |
 | GFM | ✅ |
+
+## Large Flow Diagram (12 × 20)
+
+\`\`\`mermaid
+${largeFlowDiagram}
+\`\`\`
 
 ## Class Diagram
 

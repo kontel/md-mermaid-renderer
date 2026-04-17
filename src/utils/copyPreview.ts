@@ -19,10 +19,17 @@ const COPY_IMAGE_BASE_FONT_PX = 14;
 /** Export width range (CSS pixels). Small diagrams scale down to min; large cap at max. Exported for tests. */
 export const MIN_PNG_WIDTH = 240;
 export const MAX_PNG_WIDTH = 600;
+/** Diagrams with intrinsic width above this are treated as "large" and allowed to grow past MAX_PNG_WIDTH. */
+export const LARGE_DIAGRAM_THRESHOLD = 1400;
+/** Hard cap for large/complex diagrams. Keeps PNGs manageable for clipboard/disk while staying legible. */
+export const ABSOLUTE_MAX_PNG_WIDTH = 6000;
 
 /**
- * Target export width from intrinsic diagram size so small diagrams (e.g. class) export smaller
- * and large ones (e.g. sequence) stay readable but capped.
+ * Target export width from intrinsic diagram size.
+ * - Tiny diagrams shrink toward MIN_PNG_WIDTH for tidy inline previews.
+ * - Typical diagrams (up to ~1400px native) cap at MAX_PNG_WIDTH.
+ * - Large/complex diagrams (e.g. wide grids, dense flows) scale up so labels stay readable,
+ *   bounded by ABSOLUTE_MAX_PNG_WIDTH.
  */
 export function targetExportWidth(intrinsicWidth: number): number {
   if (intrinsicWidth <= 0) return MIN_PNG_WIDTH;
@@ -32,7 +39,10 @@ export function targetExportWidth(intrinsicWidth: number): number {
   if (intrinsicWidth <= MAX_PNG_WIDTH) {
     return Math.round(intrinsicWidth * 0.88);
   }
-  return MAX_PNG_WIDTH;
+  if (intrinsicWidth <= LARGE_DIAGRAM_THRESHOLD) {
+    return MAX_PNG_WIDTH;
+  }
+  return Math.min(ABSOLUTE_MAX_PNG_WIDTH, Math.round(intrinsicWidth * 0.80));
 }
 
 const INLINE_STYLES: Record<string, Record<string, string>> = {
@@ -199,8 +209,12 @@ function svgToPngDataUri(
   let svgString = serializer.serializeToString(svgEl);
 
   const bbox = svgEl.getBoundingClientRect();
-  const intrinsicWidth = bbox.width || svgEl.viewBox?.baseVal?.width || 800;
-  const intrinsicHeight = bbox.height || svgEl.viewBox?.baseVal?.height || 600;
+  // Prefer viewBox: bbox is clamped by the container's CSS width, so large diagrams look
+  // artificially small and get their labels crushed when exported.
+  const vbWidth = svgEl.viewBox?.baseVal?.width || 0;
+  const vbHeight = svgEl.viewBox?.baseVal?.height || 0;
+  const intrinsicWidth = vbWidth || bbox.width || 800;
+  const intrinsicHeight = vbHeight || bbox.height || 600;
 
   const width = targetExportWidth(intrinsicWidth);
   const height = intrinsicHeight * (width / intrinsicWidth);

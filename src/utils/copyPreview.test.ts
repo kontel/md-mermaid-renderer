@@ -6,6 +6,8 @@ import {
   wrapSingleLineByWords,
   MIN_PNG_WIDTH,
   MAX_PNG_WIDTH,
+  LARGE_DIAGRAM_THRESHOLD,
+  ABSOLUTE_MAX_PNG_WIDTH,
 } from './copyPreview';
 
 describe('targetExportWidth', () => {
@@ -19,14 +21,26 @@ describe('targetExportWidth', () => {
     expect(targetExportWidth(300)).toBe(Math.max(MIN_PNG_WIDTH, Math.round(300 * 0.72)));
   });
 
-  it('caps at MAX_PNG_WIDTH for large diagrams', () => {
+  it('caps typical diagrams at MAX_PNG_WIDTH', () => {
     expect(targetExportWidth(800)).toBe(MAX_PNG_WIDTH);
     expect(targetExportWidth(1000)).toBe(MAX_PNG_WIDTH);
+    expect(targetExportWidth(LARGE_DIAGRAM_THRESHOLD)).toBe(MAX_PNG_WIDTH);
   });
 
   it('scales mid-range by 0.88', () => {
     const w = 400;
     expect(targetExportWidth(w)).toBe(Math.round(w * 0.88));
+  });
+
+  it('grows past MAX_PNG_WIDTH for large/complex diagrams', () => {
+    const w = 3000;
+    expect(targetExportWidth(w)).toBe(Math.round(w * 0.80));
+    expect(targetExportWidth(w)).toBeGreaterThan(MAX_PNG_WIDTH);
+  });
+
+  it('caps very large diagrams at ABSOLUTE_MAX_PNG_WIDTH', () => {
+    expect(targetExportWidth(9289)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
+    expect(targetExportWidth(20000)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
   });
 });
 
