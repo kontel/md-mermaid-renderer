@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
+import { HighlightedEditor } from './components/HighlightedEditor';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
@@ -126,7 +127,7 @@ function generateLargeFlow(): string {
 
 const largeFlowDiagram = generateLargeFlow();
 
-const defaultMarkdown = `# Markdown with Mermaid Demo
+const mainMarkdown = `# Markdown with Mermaid Demo
 
 This is a **markdown** renderer with support for *inline* Mermaid diagrams.
 
@@ -201,12 +202,6 @@ function greet(name) {
 | Mermaid | ✅ |
 | GFM | ✅ |
 
-## Large Flow Diagram (12 × 20)
-
-\`\`\`mermaid
-${largeFlowDiagram}
-\`\`\`
-
 ## Class Diagram
 
 \`\`\`mermaid
@@ -223,23 +218,151 @@ classDiagram
 \`\`\`
 `;
 
+const largeFlowMarkdown = `# Large Flow Diagram (12 × 20)
+
+A heavy flow used to exercise rendering performance. Isolated in its own tab so edits in the basic demo don't force it to re-render.
+
+\`\`\`mermaid
+${largeFlowDiagram}
+\`\`\`
+`;
+
+const galleryMarkdown = `# Diagram Gallery
+
+A quick tour of Mermaid's other diagram types — beyond the flowcharts, sequence, and class diagrams in the Basic tab.
+
+## State Diagram
+
+\`\`\`mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Loading: fetch
+    Loading --> Success: 200
+    Loading --> Error: fail
+    Success --> Idle: reset
+    Error --> Idle: retry
+    Success --> [*]
+\`\`\`
+
+## Entity Relationship
+
+\`\`\`mermaid
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE_ITEM : contains
+    PRODUCT ||--o{ LINE_ITEM : listed_in
+    CUSTOMER {
+        string name
+        string email
+    }
+    ORDER {
+        int id
+        date placed_at
+    }
+\`\`\`
+
+## Gantt Chart
+
+\`\`\`mermaid
+gantt
+    title Release plan
+    dateFormat YYYY-MM-DD
+    section Design
+    Mockups    :done,   2026-04-01, 5d
+    Review     :active, 2026-04-06, 2d
+    section Build
+    Implement  :        2026-04-08, 7d
+    QA         :        2026-04-15, 3d
+\`\`\`
+
+## Pie Chart
+
+\`\`\`mermaid
+pie title Traffic sources
+    "Organic" : 45
+    "Referral" : 30
+    "Direct" : 15
+    "Social" : 10
+\`\`\`
+
+## User Journey
+
+\`\`\`mermaid
+journey
+    title A day at the keyboard
+    section Morning
+      Stand-up:     3: Me
+      Code review:  4: Me
+    section Afternoon
+      Debug session: 2: Me
+      Ship it:       5: Me
+\`\`\`
+
+## Mindmap
+
+\`\`\`mermaid
+mindmap
+  root((Mermaid))
+    Flowcharts
+      Shapes
+      Arrows
+    Sequence
+      Actors
+      Messages
+    Other
+      Gantt
+      Pie
+      State
+\`\`\`
+
+## Git Graph
+
+\`\`\`mermaid
+gitGraph
+    commit
+    commit
+    branch feature
+    commit
+    commit
+    checkout main
+    merge feature
+    commit
+\`\`\`
+`;
+
+type TabId = 'main' | 'large' | 'gallery';
+
+const TABS: { id: TabId; label: string; defaultContent: string; storageKey: string }[] = [
+  { id: 'main', label: 'Basic', defaultContent: mainMarkdown, storageKey: 'md-mermaid-content-main' },
+  { id: 'large', label: 'Large flow', defaultContent: largeFlowMarkdown, storageKey: 'md-mermaid-content-large' },
+  { id: 'gallery', label: 'Gallery', defaultContent: galleryMarkdown, storageKey: 'md-mermaid-content-gallery' },
+];
+
+const RENDER_MODES: { value: MermaidRenderMode; label: string; hint: string }[] = [
+  { value: 'default', label: 'Default', hint: 'Standard mermaid.js' },
+  { value: 'beautiful-svg', label: 'Beautiful', hint: 'Themed SVG rendering' },
+  { value: 'beautiful-ascii', label: 'ASCII', hint: 'Text/ASCII rendering' },
+];
+
 function RenderModeSelector() {
   const { renderMode, setRenderMode, setDrawerOpen } = useMermaidContext();
   const isBeautiful = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
 
   return (
-    <div className="render-mode-selector">
-      <label htmlFor="render-mode">Renderer:</label>
-      <select
-        id="render-mode"
-        value={renderMode}
-        onChange={(e) => setRenderMode(e.target.value as MermaidRenderMode)}
-        title="Choose how Mermaid diagrams are rendered"
-      >
-        <option value="default">Default (mermaid.js)</option>
-        <option value="beautiful-svg">Beautiful Mermaid (SVG)</option>
-        <option value="beautiful-ascii">Beautiful Mermaid (ASCII)</option>
-      </select>
+    <>
+      <div className="segmented" role="group" aria-label="Diagram renderer">
+        {RENDER_MODES.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            aria-pressed={renderMode === m.value}
+            onClick={() => setRenderMode(m.value)}
+            title={m.hint}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
       {isBeautiful && (
         <button
           className="theme-btn-trigger"
@@ -249,7 +372,52 @@ function RenderModeSelector() {
           Theme
         </button>
       )}
-    </div>
+    </>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
   );
 }
 
@@ -262,6 +430,26 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
   } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (groupRef.current && !groupRef.current.contains(e.target as Node)) {
+        setPopoverOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPopoverOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [popoverOpen]);
 
   const handleCopy = async () => {
     if (!previewRef.current) return;
@@ -274,50 +462,73 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
     setTimeout(() => setStatus('idle'), 2000);
   };
 
+  const btnLabel =
+    status === 'copied' ? 'Copied!' :
+    status === 'failed' ? 'Failed' :
+    'Copy';
+
   return (
-    <div className="copy-preview-group">
+    <div className="copy-preview-group" ref={groupRef}>
       <button
         className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
         onClick={handleCopy}
         title="Copy preview to clipboard (rich HTML with diagrams as images)"
       >
-        {status === 'idle' && 'Copy to clipboard'}
-        {status === 'copied' && 'Copied!'}
-        {status === 'failed' && 'Failed'}
+        <CopyIcon />
+        {btnLabel}
       </button>
-      <select
-        className="copy-strategy-select"
-        value={strategy}
-        onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
-        title="How diagrams are converted to images for pasting"
-        aria-label="Copy strategy"
+      <button
+        className="copy-settings-btn"
+        onClick={() => setPopoverOpen((o) => !o)}
+        aria-expanded={popoverOpen}
+        aria-haspopup="true"
+        title="Copy settings"
       >
-        <option value="auto">Auto</option>
-        <option value="svg-pipeline">SVG (fast)</option>
-        <option value="dom-capture">DOM (pixel-perfect)</option>
-      </select>
-      <select
-        className="copy-strategy-select"
-        value={labelWrapAggressiveness}
-        onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
-        title="How aggressively long label text wraps in copied diagram images"
-        aria-label="Label wrap aggressiveness"
-      >
-        <option value="compact">Wrap: Compact</option>
-        <option value="normal">Wrap: Normal</option>
-        <option value="wide">Wrap: Wide</option>
-      </select>
-      <select
-        className="copy-strategy-select"
-        value={copyImageFontSize}
-        onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
-        title="Font size of text in copied/saved diagram images"
-        aria-label="Copy image font size"
-      >
-        <option value="small">Font: Small</option>
-        <option value="normal">Font: Normal</option>
-        <option value="large">Font: Large</option>
-      </select>
+        <GearIcon />
+      </button>
+      {popoverOpen && (
+        <div className="copy-popover" role="dialog" aria-label="Copy settings">
+          <div className="copy-popover-row">
+            <label htmlFor="copy-strategy">Strategy</label>
+            <select
+              id="copy-strategy"
+              value={strategy}
+              onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+              title="How diagrams are converted to images for pasting"
+            >
+              <option value="auto">Auto</option>
+              <option value="svg-pipeline">SVG (fast)</option>
+              <option value="dom-capture">DOM (pixel-perfect)</option>
+            </select>
+          </div>
+          <div className="copy-popover-row">
+            <label htmlFor="copy-wrap">Label wrap</label>
+            <select
+              id="copy-wrap"
+              value={labelWrapAggressiveness}
+              onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
+              title="How aggressively long label text wraps in copied diagram images"
+            >
+              <option value="compact">Compact</option>
+              <option value="normal">Normal</option>
+              <option value="wide">Wide</option>
+            </select>
+          </div>
+          <div className="copy-popover-row">
+            <label htmlFor="copy-font">Image font size</label>
+            <select
+              id="copy-font"
+              value={copyImageFontSize}
+              onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
+              title="Font size of text in copied/saved diagram images"
+            >
+              <option value="small">Small</option>
+              <option value="normal">Normal</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -325,19 +536,61 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
 function AppContent() {
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
   const previewRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
 
-  const [markdown, setMarkdown] = useState(() => {
-    if (isPreviewMode) {
-      return localStorage.getItem(STORAGE_KEY) || defaultMarkdown;
+  const [tabContents, setTabContents] = useState<Record<TabId, string>>(() => {
+    const init = {} as Record<TabId, string>;
+    for (const t of TABS) {
+      const stored = localStorage.getItem(t.storageKey);
+      init[t.id] = stored !== null ? stored : t.defaultContent;
     }
-    return defaultMarkdown;
+    return init;
   });
 
+  const [activeTab, setActiveTab] = useState<TabId>('main');
+  const markdown = tabContents[activeTab];
+  const setMarkdown = (v: string) =>
+    setTabContents((prev) => ({ ...prev, [activeTab]: v }));
+
+  const [splitPercent, setSplitPercent] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewDark, setPreviewDark] = useState(false);
+
   useEffect(() => {
-    if (!isPreviewMode) {
-      localStorage.setItem(STORAGE_KEY, markdown);
+    if (isPreviewMode) return;
+    for (const t of TABS) {
+      localStorage.setItem(t.storageKey, tabContents[t.id]);
     }
-  }, [markdown, isPreviewMode]);
+  }, [tabContents, isPreviewMode]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = mainRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setSplitPercent(Math.min(80, Math.max(20, pct)));
+    };
+    const onUp = () => setIsDragging(false);
+    document.body.classList.add('is-dragging-col');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.body.classList.remove('is-dragging-col');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
+  const handleSplitterDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleSplitterKey = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') setSplitPercent((p) => Math.max(20, p - 2));
+    if (e.key === 'ArrowRight') setSplitPercent((p) => Math.min(80, p + 2));
+  }, []);
 
   const openPreviewTab = () => {
     localStorage.setItem(STORAGE_KEY, markdown);
@@ -345,9 +598,10 @@ function AppContent() {
   };
 
   if (isPreviewMode) {
+    const previewContent = localStorage.getItem(STORAGE_KEY) || markdown;
     return (
       <div className="preview-only">
-        <MarkdownRenderer content={markdown} />
+        <MarkdownRenderer content={previewContent} />
       </div>
     );
   }
@@ -379,31 +633,70 @@ function AppContent() {
           <RenderModeSelector />
           <div className="header-divider" />
           <button
-            className="open-preview-btn"
+            className="icon-btn"
             onClick={openPreviewTab}
             title="Open a standalone preview tab for PDF export"
+            aria-label="Open preview in a new tab"
           >
-            Open in a new tab
+            <ExternalLinkIcon />
           </button>
         </div>
       </header>
-      <main className="main">
+      <main
+        className="main"
+        ref={mainRef}
+        style={{ ['--split' as string]: `${splitPercent}%` } as React.CSSProperties}
+      >
         <div className="editor-pane">
-          <div className="pane-header">Editor</div>
-          <textarea
-            className="editor"
+          <div className="pane-header">
+            <div className="editor-tabs" role="tablist" aria-label="Editor tabs">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === t.id}
+                  className="editor-tab"
+                  onClick={() => setActiveTab(t.id)}
+                  title={t.label}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <HighlightedEditor
             value={markdown}
-            onChange={(e) => setMarkdown(e.target.value)}
+            onChange={setMarkdown}
             placeholder="Enter your markdown here..."
-            spellCheck={false}
           />
         </div>
+        <div
+          className={`splitter ${isDragging ? 'is-dragging' : ''}`}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize editor"
+          tabIndex={0}
+          onMouseDown={handleSplitterDown}
+          onKeyDown={handleSplitterKey}
+        />
         <div className="preview-pane">
           <div className="pane-header">
-            Preview
-            <CopyPreviewButton previewRef={previewRef} />
+            <span>Preview</span>
+            <div className="pane-header-actions">
+              <button
+                className="preview-theme-toggle"
+                onClick={() => setPreviewDark((d) => !d)}
+                title={previewDark ? 'Switch preview to light' : 'Switch preview to dark'}
+                aria-label="Toggle preview theme"
+                aria-pressed={previewDark}
+              >
+                {previewDark ? <SunIcon /> : <MoonIcon />}
+              </button>
+              <CopyPreviewButton previewRef={previewRef} />
+            </div>
           </div>
-          <div className="preview" ref={previewRef}>
+          <div className={`preview ${previewDark ? 'preview--dark' : ''}`} ref={previewRef}>
             <MarkdownRenderer content={markdown} />
           </div>
         </div>
