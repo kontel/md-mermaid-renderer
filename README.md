@@ -10,10 +10,16 @@ A React SPA for rendering Markdown with inline Mermaid diagram support. Features
   - Default (mermaid.js) - standard SVG rendering
   - Beautiful Mermaid SVG - styled SVG output
   - Beautiful Mermaid ASCII - terminal-friendly text output
+- Beautiful Mermaid theme controls:
+  - Built-in light and dark presets
+  - Custom colors and font family
+  - Diagram padding, node gap, layer gap, and component gap
+  - Transparent SVG background
+  - Interactive XY chart tooltips
 - Live preview with split-pane editor
 - Open preview in separate tab for PDF export
 - Copy preview to clipboard for pasting into Outlook, Word, and Confluence (SVG diagrams are converted to PNG images for compatibility)
-- Render mode persisted to localStorage
+- Render mode and theme settings persisted to localStorage
 - Print-friendly styling
 
 ## Getting Started
@@ -45,7 +51,7 @@ flowchart TD
 ````
 
 4. Select a rendering mode from the "Renderer" dropdown in the header
-5. When using a Beautiful Mermaid mode, click "Theme" to customize diagram colors and fonts
+5. When using a Beautiful Mermaid mode, click "Theme" to customize diagram colors, typography, layout spacing, and XY chart tooltip behavior
 6. Click "Copy" in the preview pane header to copy the rendered content (including diagrams as images) to your clipboard, then paste into Outlook, Word, or Confluence
 7. Click the `▾` toggle next to Copy to choose a diagram conversion strategy (Auto, SVG, or DOM)
 8. Click "New Tab" to open a standalone preview for PDF export via browser print
@@ -75,7 +81,7 @@ In all strategies:
 | **remark-gfm** | Plugin for react-markdown that adds GitHub Flavored Markdown support (tables, strikethrough, task lists, etc.) |
 | **rehype-raw** | Plugin that allows raw HTML embedded in Markdown to pass through |
 | **mermaid** | Renders diagram definitions (flowcharts, sequence diagrams, etc.) into SVG |
-| **beautiful-mermaid** | Alternative mermaid renderer with SVG and ASCII output options |
+| **beautiful-mermaid** | Alternative mermaid renderer with styled SVG, ASCII output, XY charts, presets, and layout options |
 | **html2canvas** | Renders DOM elements to canvas for pixel-perfect diagram-to-PNG conversion |
 
 ### Dev Dependencies

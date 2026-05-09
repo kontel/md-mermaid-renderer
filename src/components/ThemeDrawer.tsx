@@ -1,5 +1,6 @@
 import { THEMES } from 'beautiful-mermaid';
 import { useMermaidContext, type ThemeConfig, type ThemePreset } from '../context/MermaidContext';
+import { DEFAULT_THEME_CONFIG } from '../context/themeConfig';
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Fira Code', 'JetBrains Mono', 'system-ui', 'monospace'];
 
@@ -63,6 +64,34 @@ function ColorInput({ label, value, onChange }: ColorInputProps) {
   );
 }
 
+interface NumberInputProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+}
+
+function NumberInput({ label, value, min, max, step = 1, onChange }: NumberInputProps) {
+  return (
+    <div className="theme-number-input">
+      <label>{label}</label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (Number.isFinite(next)) onChange(next);
+        }}
+      />
+    </div>
+  );
+}
+
 export function ThemeDrawer() {
   const { themeConfig, setThemeConfig, isDrawerOpen, setDrawerOpen, renderMode } = useMermaidContext();
 
@@ -80,6 +109,11 @@ export function ThemeDrawer() {
           ...presetValues,
           font: 'Inter',
           transparent: false,
+          padding: DEFAULT_THEME_CONFIG.padding,
+          nodeSpacing: DEFAULT_THEME_CONFIG.nodeSpacing,
+          layerSpacing: DEFAULT_THEME_CONFIG.layerSpacing,
+          componentSpacing: DEFAULT_THEME_CONFIG.componentSpacing,
+          interactive: DEFAULT_THEME_CONFIG.interactive,
         });
       }
     }
@@ -97,6 +131,14 @@ export function ThemeDrawer() {
     setThemeConfig({ ...themeConfig, transparent, preset: 'custom' });
   };
 
+  const handleBooleanOptionChange = (key: keyof ThemeConfig, value: boolean) => {
+    setThemeConfig({ ...themeConfig, [key]: value, preset: 'custom' });
+  };
+
+  const handleNumberOptionChange = (key: keyof ThemeConfig, value: number) => {
+    setThemeConfig({ ...themeConfig, [key]: value, preset: 'custom' });
+  };
+
   const handleRandomize = () => {
     const randomColors = generateRandomTheme();
     setThemeConfig({
@@ -108,19 +150,7 @@ export function ThemeDrawer() {
 
   const handleReset = () => {
     if (themeConfig.preset === 'custom') {
-      // Reset to default custom colors
-      setThemeConfig({
-        preset: 'custom',
-        bg: '#1a1b26',
-        fg: '#a9b1d6',
-        line: '#565f89',
-        accent: '#7aa2f7',
-        muted: '#565f89',
-        surface: '#24283b',
-        border: '#414868',
-        font: 'Inter',
-        transparent: false,
-      });
+      setThemeConfig(DEFAULT_THEME_CONFIG);
     } else {
       handlePresetChange(themeConfig.preset);
     }
@@ -230,6 +260,38 @@ export function ThemeDrawer() {
           </div>
 
           <div className="theme-section">
+            <h3>Layout</h3>
+            <NumberInput
+              label="Padding"
+              value={themeConfig.padding ?? DEFAULT_THEME_CONFIG.padding ?? 40}
+              min={0}
+              max={160}
+              onChange={(v) => handleNumberOptionChange('padding', v)}
+            />
+            <NumberInput
+              label="Node Gap"
+              value={themeConfig.nodeSpacing ?? DEFAULT_THEME_CONFIG.nodeSpacing ?? 24}
+              min={0}
+              max={120}
+              onChange={(v) => handleNumberOptionChange('nodeSpacing', v)}
+            />
+            <NumberInput
+              label="Layer Gap"
+              value={themeConfig.layerSpacing ?? DEFAULT_THEME_CONFIG.layerSpacing ?? 40}
+              min={0}
+              max={160}
+              onChange={(v) => handleNumberOptionChange('layerSpacing', v)}
+            />
+            <NumberInput
+              label="Component Gap"
+              value={themeConfig.componentSpacing ?? DEFAULT_THEME_CONFIG.componentSpacing ?? 24}
+              min={0}
+              max={160}
+              onChange={(v) => handleNumberOptionChange('componentSpacing', v)}
+            />
+          </div>
+
+          <div className="theme-section">
             <h3>Options</h3>
             <label className="theme-checkbox">
               <input
@@ -238,6 +300,14 @@ export function ThemeDrawer() {
                 onChange={(e) => handleTransparentChange(e.target.checked)}
               />
               Transparent Background
+            </label>
+            <label className="theme-checkbox">
+              <input
+                type="checkbox"
+                checked={themeConfig.interactive || false}
+                onChange={(e) => handleBooleanOptionChange('interactive', e.target.checked)}
+              />
+              Interactive XY Chart Tooltips
             </label>
           </div>
 

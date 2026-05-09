@@ -61,6 +61,13 @@ describe('mermaidStorage', () => {
     it('returns default when storage empty', () => {
       const config = loadThemeConfig();
       expect(config).toEqual(DEFAULT_THEME_CONFIG);
+      expect(config).toMatchObject({
+        padding: 40,
+        nodeSpacing: 24,
+        layerSpacing: 40,
+        componentSpacing: 24,
+        interactive: false,
+      });
     });
     it('merges stored JSON with defaults', () => {
       localStorage.setItem(THEME_CONFIG_STORAGE_KEY, JSON.stringify({ bg: '#ffffff', fg: '#000000' }));

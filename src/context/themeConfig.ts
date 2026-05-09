@@ -31,6 +31,11 @@ export interface ThemeConfig {
   border?: string;
   font?: string;
   transparent?: boolean;
+  padding?: number;
+  nodeSpacing?: number;
+  layerSpacing?: number;
+  componentSpacing?: number;
+  interactive?: boolean;
 }
 
 export const DEFAULT_THEME_CONFIG: ThemeConfig = {
@@ -44,4 +49,9 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
   border: '#414868',
   font: 'Inter',
   transparent: false,
+  padding: 40,
+  nodeSpacing: 24,
+  layerSpacing: 40,
+  componentSpacing: 24,
+  interactive: false,
 };

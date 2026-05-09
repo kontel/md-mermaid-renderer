@@ -1069,6 +1069,35 @@
 
 .theme-font-select select { width: 160px; }
 
+.theme-number-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.theme-number-input label {
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.theme-number-input input[type='number'] {
+  width: 88px;
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  font-family: var(--mono-font);
+}
+
+.theme-number-input input[type='number']:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
 .theme-checkbox {
   display: flex;
   align-items: center;

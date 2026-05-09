@@ -9,20 +9,30 @@ describe('buildThemeOptions', () => {
   });
 
   it('adds optional keys when present', () => {
-    const config: ThemeConfig = {
+    const config = {
       preset: 'custom',
       bg: '#000',
       fg: '#fff',
       line: '#aaa',
       accent: '#f00',
       font: 'Inter',
-    };
+      padding: 32,
+      nodeSpacing: 30,
+      layerSpacing: 48,
+      componentSpacing: 36,
+      interactive: true,
+    } as ThemeConfig;
     const out = buildThemeOptions(config);
     expect(out.bg).toBe('#000');
     expect(out.fg).toBe('#fff');
     expect(out.line).toBe('#aaa');
     expect(out.accent).toBe('#f00');
     expect(out.font).toBe('Inter');
+    expect(out.padding).toBe(32);
+    expect(out.nodeSpacing).toBe(30);
+    expect(out.layerSpacing).toBe(48);
+    expect(out.componentSpacing).toBe(36);
+    expect(out.interactive).toBe(true);
   });
 
   it('omits optional keys when undefined', () => {
@@ -64,6 +74,7 @@ describe('computeBeautifulRender', () => {
     const result = computeBeautifulRender('graph TD\nA-->B', config, 'beautiful-ascii');
     expect(result.error).toBeNull();
     expect(result.ascii.length).toBeGreaterThan(0);
+    expect(result.ascii).not.toContain('<span');
     expect(result.svg).toBe('');
   });
 
