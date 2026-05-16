@@ -79,3 +79,11 @@ Deployed to GitHub Pages via GitHub Actions. Base path is `/md-mermaid-renderer/
 - React functional components with hooks
 - CSS in App.css (no CSS-in-JS)
 - Prefer type imports (`import type { X }`) for types only
+
+## Cursor Cloud specific instructions
+
+- **Single service**: This is a purely client-side SPA. The only service to run is the Vite dev server (`pnpm dev`) which serves at `http://localhost:5173/md-mermaid-renderer/`.
+- **No secrets or external services** needed — no database, no API keys, no Docker.
+- **Pre-existing lint errors**: `pnpm lint` currently reports 3 pre-existing ESLint errors (2 in `HighlightedEditor.tsx`, 1 react-refresh warning in `MermaidContext.tsx`). These are not regressions.
+- **esbuild build scripts warning**: pnpm may warn about ignored build scripts for esbuild. This is harmless — the esbuild binary is already functional from the lockfile.
+- **Dev commands reference**: See the "Development Commands" section above for all standard commands.
