@@ -6,6 +6,7 @@ export const RENDER_MODE_STORAGE_KEY = 'md-mermaid-render-mode';
 export const THEME_CONFIG_STORAGE_KEY = 'md-mermaid-theme-config';
 export const LABEL_WRAP_STORAGE_KEY = 'md-mermaid-label-wrap';
 export const COPY_IMAGE_FONT_SIZE_STORAGE_KEY = 'md-mermaid-copy-image-font-size';
+export const COPY_TARGET_STORAGE_KEY = 'md-mermaid-copy-target';
 
 export function isValidRenderMode(value: string | null): value is MermaidRenderMode {
   return value === 'default' || value === 'beautiful-svg' || value === 'beautiful-ascii';

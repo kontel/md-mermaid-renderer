@@ -6,6 +6,8 @@ import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
 import type { CopyImageFontSize, CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
+import { COPY_TARGETS, copyTargetProfile } from './lib/copyTargets';
+import type { CopyTarget } from './lib/copyTargets';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
@@ -421,12 +423,20 @@ function ExternalLinkIcon() {
   );
 }
 
-function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDivElement | null> }) {
+function CopyPreviewButton({
+  previewRef,
+  markdownSource,
+}: {
+  previewRef: React.RefObject<HTMLDivElement | null>;
+  markdownSource: string;
+}) {
   const {
     labelWrapAggressiveness,
     setLabelWrapAggressiveness,
     copyImageFontSize,
     setCopyImageFontSize,
+    copyTarget,
+    setCopyTarget,
   } = useMermaidContext();
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [strategy, setStrategy] = useState<CopyStrategy>('auto');
@@ -451,10 +461,18 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
     };
   }, [popoverOpen]);
 
+  const profile = copyTargetProfile(copyTarget);
+
   const handleCopy = async () => {
     if (!previewRef.current) return;
     try {
-      await copyPreview(previewRef.current, strategy, labelWrapAggressiveness, copyImageFontSize);
+      await copyPreview(previewRef.current, {
+        target: copyTarget,
+        strategy,
+        wrapAggressiveness: labelWrapAggressiveness,
+        copyImageFontSize,
+        markdownSource,
+      });
       setStatus('copied');
     } catch {
       setStatus('failed');
@@ -465,14 +483,14 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
   const btnLabel =
     status === 'copied' ? 'Copied!' :
     status === 'failed' ? 'Failed' :
-    'Copy';
+    copyTarget === 'rich' ? 'Copy' : `Copy · ${profile.label}`;
 
   return (
     <div className="copy-preview-group" ref={groupRef}>
       <button
         className={`copy-preview-btn ${status !== 'idle' ? `copy-preview-btn--${status}` : ''}`}
         onClick={handleCopy}
-        title="Copy preview to clipboard (rich HTML with diagrams as images)"
+        title={`Copy preview for ${profile.label} — ${profile.hint}`}
       >
         <CopyIcon />
         {btnLabel}
@@ -489,44 +507,64 @@ function CopyPreviewButton({ previewRef }: { previewRef: React.RefObject<HTMLDiv
       {popoverOpen && (
         <div className="copy-popover" role="dialog" aria-label="Copy settings">
           <div className="copy-popover-row">
-            <label htmlFor="copy-strategy">Strategy</label>
+            <label htmlFor="copy-target">Paste into</label>
             <select
-              id="copy-strategy"
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
-              title="How diagrams are converted to images for pasting"
+              id="copy-target"
+              value={copyTarget}
+              onChange={(e) => setCopyTarget(e.target.value as CopyTarget)}
+              title="Tunes fonts, spacing and image sizing for the system you're pasting into"
             >
-              <option value="auto">Auto</option>
-              <option value="svg-pipeline">SVG (fast)</option>
-              <option value="dom-capture">DOM (pixel-perfect)</option>
+              {COPY_TARGETS.map((t) => (
+                <option key={t} value={t}>
+                  {copyTargetProfile(t).label}
+                </option>
+              ))}
             </select>
+            <p className="copy-popover-hint">{profile.hint}</p>
           </div>
-          <div className="copy-popover-row">
-            <label htmlFor="copy-wrap">Label wrap</label>
-            <select
-              id="copy-wrap"
-              value={labelWrapAggressiveness}
-              onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
-              title="How aggressively long label text wraps in copied diagram images"
-            >
-              <option value="compact">Compact</option>
-              <option value="normal">Normal</option>
-              <option value="wide">Wide</option>
-            </select>
-          </div>
-          <div className="copy-popover-row">
-            <label htmlFor="copy-font">Image font size</label>
-            <select
-              id="copy-font"
-              value={copyImageFontSize}
-              onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
-              title="Font size of text in copied/saved diagram images"
-            >
-              <option value="small">Small</option>
-              <option value="normal">Normal</option>
-              <option value="large">Large</option>
-            </select>
-          </div>
+          {profile.emitsHtml && (
+            <>
+              <div className="copy-popover-row">
+                <label htmlFor="copy-strategy">Strategy</label>
+                <select
+                  id="copy-strategy"
+                  value={strategy}
+                  onChange={(e) => setStrategy(e.target.value as CopyStrategy)}
+                  title="How diagrams are converted to images for pasting"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="svg-pipeline">SVG (fast)</option>
+                  <option value="dom-capture">DOM (pixel-perfect)</option>
+                </select>
+              </div>
+              <div className="copy-popover-row">
+                <label htmlFor="copy-wrap">Label wrap</label>
+                <select
+                  id="copy-wrap"
+                  value={labelWrapAggressiveness}
+                  onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
+                  title="How aggressively long label text wraps in copied diagram images"
+                >
+                  <option value="compact">Compact</option>
+                  <option value="normal">Normal</option>
+                  <option value="wide">Wide</option>
+                </select>
+              </div>
+              <div className="copy-popover-row">
+                <label htmlFor="copy-font">Image font size</label>
+                <select
+                  id="copy-font"
+                  value={copyImageFontSize}
+                  onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
+                  title="Font size of text in copied/saved diagram images"
+                >
+                  <option value="small">Small</option>
+                  <option value="normal">Normal</option>
+                  <option value="large">Large</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -693,7 +731,7 @@ function AppContent() {
               >
                 {previewDark ? <SunIcon /> : <MoonIcon />}
               </button>
-              <CopyPreviewButton previewRef={previewRef} />
+              <CopyPreviewButton previewRef={previewRef} markdownSource={markdown} />
             </div>
           </div>
           <div className={`preview ${previewDark ? 'preview--dark' : ''}`} ref={previewRef}>

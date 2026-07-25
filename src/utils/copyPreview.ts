@@ -1,7 +1,17 @@
 import html2canvas from 'html2canvas';
 import { FLOWCHART_PADDING } from '../config/flowchart';
+import { copyTargetProfile } from '../lib/copyTargets';
+import type { CopyTarget, CopyTargetProfile } from '../lib/copyTargets';
+import { diagramAltText, prepareDocument, styleDiagramFigure } from '../lib/copyDocument';
 
 export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
+
+/** A rendered diagram: the PNG plus the CSS-pixel size it should display at. */
+export interface DiagramPng {
+  dataUri: string;
+  width: number;
+  height: number;
+}
 export type LabelWrapAggressiveness = 'compact' | 'normal' | 'wide';
 
 /** Font size scale when copying/saving diagram images. */
@@ -29,10 +39,16 @@ export const ABSOLUTE_MAX_PNG_WIDTH = 6000;
  * - Tiny diagrams shrink toward MIN_PNG_WIDTH for tidy inline previews.
  * - Typical diagrams (up to ~1400px native) cap at MAX_PNG_WIDTH.
  * - Large/complex diagrams (e.g. wide grids, dense flows) scale up so labels stay readable,
- *   bounded by ABSOLUTE_MAX_PNG_WIDTH.
+ *   bounded by ABSOLUTE_MAX_PNG_WIDTH or the caller's tighter `maxRenderWidth`.
  */
-export function targetExportWidth(intrinsicWidth: number): number {
+export function targetExportWidth(
+  intrinsicWidth: number,
+  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
+): number {
   if (intrinsicWidth <= 0) return MIN_PNG_WIDTH;
+
+  const cap = Math.min(ABSOLUTE_MAX_PNG_WIDTH, maxRenderWidth || ABSOLUTE_MAX_PNG_WIDTH);
+
   if (intrinsicWidth < 380) {
     return Math.max(MIN_PNG_WIDTH, Math.round(intrinsicWidth * 0.72));
   }
@@ -42,65 +58,8 @@ export function targetExportWidth(intrinsicWidth: number): number {
   if (intrinsicWidth <= LARGE_DIAGRAM_THRESHOLD) {
     return MAX_PNG_WIDTH;
   }
-  return Math.min(ABSOLUTE_MAX_PNG_WIDTH, Math.round(intrinsicWidth * 0.80));
+  return Math.min(cap, Math.round(intrinsicWidth * 0.80));
 }
-
-const INLINE_STYLES: Record<string, Record<string, string>> = {
-  '.markdown-body': {
-    color: '#24292e',
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
-    fontSize: '16px',
-    lineHeight: '1.6',
-  },
-  'h1, h2, h3, h4, h5, h6': {
-    fontWeight: '600',
-    lineHeight: '1.25',
-    color: '#1a1a2e',
-  },
-  h1: { fontSize: '2em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' },
-  h2: { fontSize: '1.5em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' },
-  h3: { fontSize: '1.25em' },
-  table: { borderCollapse: 'collapse', width: '100%' },
-  'th, td': { padding: '0.5em 1em', border: '1px solid #dfe2e5' },
-  th: { backgroundColor: '#f6f8fa', fontWeight: '600' },
-  '.code-block': {
-    backgroundColor: '#282c34',
-    color: '#abb2bf',
-    padding: '1em',
-    borderRadius: '6px',
-    fontFamily: "'Fira Code', Consolas, Monaco, monospace",
-    fontSize: '0.9em',
-    lineHeight: '1.5',
-    whiteSpace: 'pre',
-    overflowX: 'auto',
-  },
-  '.inline-code': {
-    backgroundColor: 'rgba(27, 31, 35, 0.05)',
-    padding: '0.2em 0.4em',
-    borderRadius: '3px',
-    fontFamily: "'Fira Code', Consolas, Monaco, monospace",
-    fontSize: '0.9em',
-  },
-  '.mermaid-ascii': {
-    backgroundColor: '#1a1a2e',
-    color: '#eaeaea',
-    border: '1px solid #0f3460',
-    borderRadius: '6px',
-    fontFamily: "'Fira Code', Consolas, Monaco, monospace",
-    fontSize: '0.85em',
-    lineHeight: '1.4',
-    padding: '1em',
-    whiteSpace: 'pre',
-  },
-  '.mermaid-error': {
-    backgroundColor: '#ffeef0',
-    border: '1px solid #f97583',
-    borderRadius: '6px',
-    padding: '1em',
-    color: '#cb2431',
-    fontSize: '0.9em',
-  },
-};
 
 export function escapeXml(unsafe: string): string {
   return unsafe
@@ -177,33 +136,16 @@ function autoWrapLinesByBoxWidth(
   return wrapped;
 }
 
-function applyInlineStyles(root: HTMLElement) {
-  for (const [selector, styles] of Object.entries(INLINE_STYLES)) {
-    const elements = selector === '.markdown-body'
-      ? [root]
-      : root.querySelectorAll<HTMLElement>(selector);
-
-    for (const el of elements) {
-      for (const [prop, val] of Object.entries(styles)) {
-        el.style[prop as never] = val;
-      }
-    }
-  }
-
-  root.querySelectorAll<HTMLElement>('tr:nth-child(even)').forEach((tr) => {
-    tr.style.backgroundColor = '#f6f8fa';
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Strategy 1: SVG → Image → Canvas (fast, but foreignObject causes taint)
 // ---------------------------------------------------------------------------
 
-function svgToPngDataUri(
+function svgToPng(
   svgEl: SVGSVGElement,
   wrapAggressiveness: LabelWrapAggressiveness = 'normal',
   fontSize: CopyImageFontSize = 'normal',
-): Promise<string> {
+  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
+): Promise<DiagramPng> {
   const fontScale = COPY_IMAGE_FONT_SCALE[fontSize];
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(svgEl);
@@ -216,7 +158,7 @@ function svgToPngDataUri(
   const intrinsicWidth = vbWidth || bbox.width || 800;
   const intrinsicHeight = vbHeight || bbox.height || 600;
 
-  const width = targetExportWidth(intrinsicWidth);
+  const width = targetExportWidth(intrinsicWidth, maxRenderWidth);
   const height = intrinsicHeight * (width / intrinsicWidth);
 
   if (!svgString.includes('xmlns=')) {
@@ -315,7 +257,7 @@ function svgToPngDataUri(
   const totalWidth = width + pad * 2;
   const totalHeight = height + pad * 2;
 
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<DiagramPng>((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
       try {
@@ -330,7 +272,7 @@ function svgToPngDataUri(
         ctx.scale(scale, scale);
         ctx.drawImage(image, pad, pad, width, height);
 
-        resolve(canvas.toDataURL('image/png'));
+        resolve({ dataUri: canvas.toDataURL('image/png'), width: totalWidth, height: totalHeight });
       } catch (err) {
         reject(err);
       } finally {
@@ -349,10 +291,13 @@ function svgToPngDataUri(
 // Strategy 2: DOM capture via html2canvas (pixel-perfect, slower)
 // ---------------------------------------------------------------------------
 
-async function domToPngDataUri(el: HTMLElement): Promise<string> {
+async function domToPng(
+  el: HTMLElement,
+  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
+): Promise<DiagramPng> {
   const rect = el.getBoundingClientRect();
   const elWidth = rect.width || MAX_PNG_WIDTH;
-  const targetW = targetExportWidth(elWidth);
+  const targetW = targetExportWidth(elWidth, maxRenderWidth);
   const scale = (targetW / elWidth) * 2;
 
   const canvas = await html2canvas(el, {
@@ -361,57 +306,62 @@ async function domToPngDataUri(el: HTMLElement): Promise<string> {
     logging: false,
     useCORS: true,
   });
-  return canvas.toDataURL('image/png');
+  return {
+    dataUri: canvas.toDataURL('image/png'),
+    width: targetW,
+    height: Math.round(rect.height * (targetW / elWidth)),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Container conversion — applies the chosen strategy per diagram
 // ---------------------------------------------------------------------------
 
-function replaceContainerWithImg(container: HTMLElement, pngDataUri: string) {
+function replaceContainerWithImg(
+  container: HTMLElement,
+  png: DiagramPng,
+  profile: CopyTargetProfile,
+  index: number,
+) {
   const img = document.createElement('img');
-  img.src = pngDataUri;
-  img.style.maxWidth = '100%';
-  img.style.height = 'auto';
+  img.src = png.dataUri;
+  img.alt = diagramAltText(container, index);
 
   container.innerHTML = '';
-  container.style.display = 'block';
-  container.style.textAlign = 'center';
-  container.style.margin = '1.5em 0';
-  container.style.padding = '1em';
-  container.style.backgroundColor = '#fff';
-  container.style.border = '1px solid #e1e4e8';
-  container.style.borderRadius = '6px';
   container.appendChild(img);
+  styleDiagramFigure(container, img, profile, png.width);
 }
 
 async function convertContainer(
   liveContainer: HTMLElement,
   cloneContainer: HTMLElement,
+  index: number,
+  profile: CopyTargetProfile,
   strategy: CopyStrategy,
   wrapAggressiveness: LabelWrapAggressiveness,
   copyImageFontSize: CopyImageFontSize,
 ) {
   const liveSvg = liveContainer.querySelector<SVGSVGElement>(':scope > svg');
+  const renderCap = profile.maxRenderWidth;
 
   if (strategy === 'dom-capture') {
-    const png = await domToPngDataUri(liveContainer);
-    replaceContainerWithImg(cloneContainer, png);
+    const png = await domToPng(liveContainer, renderCap);
+    replaceContainerWithImg(cloneContainer, png, profile, index);
     return;
   }
 
   if (strategy === 'svg-pipeline') {
     if (!liveSvg) return;
-    const png = await svgToPngDataUri(liveSvg, wrapAggressiveness, copyImageFontSize);
-    replaceContainerWithImg(cloneContainer, png);
+    const png = await svgToPng(liveSvg, wrapAggressiveness, copyImageFontSize, renderCap);
+    replaceContainerWithImg(cloneContainer, png, profile, index);
     return;
   }
 
   // "auto": try SVG pipeline first, fall back to DOM capture
   if (liveSvg) {
     try {
-      const png = await svgToPngDataUri(liveSvg, wrapAggressiveness, copyImageFontSize);
-      replaceContainerWithImg(cloneContainer, png);
+      const png = await svgToPng(liveSvg, wrapAggressiveness, copyImageFontSize, renderCap);
+      replaceContainerWithImg(cloneContainer, png, profile, index);
       return;
     } catch {
       // SVG pipeline failed (likely foreignObject taint) — fall through
@@ -419,8 +369,8 @@ async function convertContainer(
   }
 
   try {
-    const png = await domToPngDataUri(liveContainer);
-    replaceContainerWithImg(cloneContainer, png);
+    const png = await domToPng(liveContainer, renderCap);
+    replaceContainerWithImg(cloneContainer, png, profile, index);
   } catch {
     // leave as-is on total failure
   }
@@ -435,12 +385,12 @@ export async function diagramToPngDataUri(
   const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
   if (svgEl) {
     try {
-      return await svgToPngDataUri(svgEl, wrapAggressiveness, copyImageFontSize);
+      return (await svgToPng(svgEl, wrapAggressiveness, copyImageFontSize)).dataUri;
     } catch {
       // fall through to DOM
     }
   }
-  return domToPngDataUri(container);
+  return (await domToPng(container)).dataUri;
 }
 
 function dataUriToBlob(dataUri: string): Blob {
@@ -486,35 +436,82 @@ export async function saveDiagramAsFile(
 // Main export
 // ---------------------------------------------------------------------------
 
-export async function copyPreview(
-  previewEl: HTMLElement,
-  strategy: CopyStrategy = 'auto',
-  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
-  copyImageFontSize: CopyImageFontSize = 'normal',
-): Promise<void> {
-  const clone = previewEl.cloneNode(true) as HTMLElement;
+export interface CopyPreviewOptions {
+  /** Target system the HTML is being styled for. Defaults to generic rich text. */
+  target?: CopyTarget;
+  strategy?: CopyStrategy;
+  wrapAggressiveness?: LabelWrapAggressiveness;
+  copyImageFontSize?: CopyImageFontSize;
+  /**
+   * Markdown source behind the preview. Used verbatim as the `text/plain` flavor —
+   * it is a far better plain-text rendering than scraping the DOM, which also drags
+   * in the per-diagram Copy/Save button labels.
+   */
+  markdownSource?: string;
+}
 
+/** Build the HTML the target system will receive. Exported for tests. */
+export async function buildTargetHtml(
+  previewEl: HTMLElement,
+  profile: CopyTargetProfile,
+  strategy: CopyStrategy,
+  wrapAggressiveness: LabelWrapAggressiveness,
+  copyImageFontSize: CopyImageFontSize,
+): Promise<string> {
+  const clone = previewEl.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('.diagram-actions').forEach((el) => el.remove());
 
   const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
 
   for (let i = 0; i < liveContainers.length; i++) {
-    await convertContainer(liveContainers[i], cloneContainers[i], strategy, wrapAggressiveness, copyImageFontSize);
+    await convertContainer(
+      liveContainers[i],
+      cloneContainers[i],
+      i,
+      profile,
+      strategy,
+      wrapAggressiveness,
+      copyImageFontSize,
+    );
   }
 
-  applyInlineStyles(clone);
+  // Style the markdown root itself, not the scroll container: `innerHTML` would
+  // drop the outer element and take the base font and colour with it.
+  const body = clone.querySelector<HTMLElement>('.markdown-body') ?? clone;
+  prepareDocument(body, profile);
 
-  const html = clone.innerHTML;
-  const plainText = previewEl.innerText;
+  return body === clone ? clone.innerHTML : body.outerHTML;
+}
 
-  const htmlBlob = new Blob([html], { type: 'text/html' });
-  const textBlob = new Blob([plainText], { type: 'text/plain' });
+export async function copyPreview(
+  previewEl: HTMLElement,
+  options: CopyPreviewOptions = {},
+): Promise<void> {
+  const {
+    target = 'rich',
+    strategy = 'auto',
+    wrapAggressiveness = 'normal',
+    copyImageFontSize = 'normal',
+    markdownSource,
+  } = options;
+
+  const profile = copyTargetProfile(target);
+  const plainText = markdownSource ?? previewEl.innerText;
+
+  if (!profile.emitsHtml) {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/plain': new Blob([plainText], { type: 'text/plain' }) }),
+    ]);
+    return;
+  }
+
+  const html = await buildTargetHtml(previewEl, profile, strategy, wrapAggressiveness, copyImageFontSize);
 
   await navigator.clipboard.write([
     new ClipboardItem({
-      'text/html': htmlBlob,
-      'text/plain': textBlob,
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([plainText], { type: 'text/plain' }),
     }),
   ]);
 }

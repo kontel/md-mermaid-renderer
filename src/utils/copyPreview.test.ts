@@ -42,6 +42,16 @@ describe('targetExportWidth', () => {
     expect(targetExportWidth(9289)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
     expect(targetExportWidth(20000)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
   });
+
+  it('honours a tighter per-target render cap', () => {
+    expect(targetExportWidth(20000, 2400)).toBe(2400);
+    expect(targetExportWidth(3000, 2400)).toBe(Math.round(3000 * 0.8));
+  });
+
+  it('ignores a cap wider than the absolute maximum, or a zero cap', () => {
+    expect(targetExportWidth(20000, 99999)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
+    expect(targetExportWidth(20000, 0)).toBe(ABSOLUTE_MAX_PNG_WIDTH);
+  });
 });
 
 describe('escapeXml', () => {

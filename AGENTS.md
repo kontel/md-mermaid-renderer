@@ -32,9 +32,11 @@ src/
 │   └── mermaidStorage.ts       # localStorage keys, validators, loadThemeConfig (pure, testable)
 ├── lib/
 │   ├── mermaidTheme.ts         # buildThemeOptions, computeBeautifulRender (pure, testable)
-│   └── markdownCodeBlock.ts    # parseCodeBlock, isMermaidBlock (pure, testable)
+│   ├── markdownCodeBlock.ts    # parseCodeBlock, isMermaidBlock (pure, testable)
+│   ├── copyTargets.ts          # Per-target paste profiles: fonts, spacing, image caps (pure data)
+│   └── copyDocument.ts         # Applies a profile to a cloned DOM (jsdom-testable)
 ├── utils/
-│   └── copyPreview.ts           # Diagram PNG export; exports pure helpers for tests
+│   └── copyPreview.ts           # Diagram PNG export + clipboard; exports pure helpers for tests
 └── test/
     └── setup.ts                # Vitest + Testing Library setup
 ```
@@ -49,6 +51,22 @@ Renders mermaid diagrams with three modes:
 
 ### MermaidContext.tsx
 Provides render mode state across the app. Persists selection to localStorage under key `md-mermaid-render-mode`.
+
+### Copy targets (lib/copyTargets.ts + lib/copyDocument.ts)
+"Copy preview" writes HTML styled for the system it will be pasted into, because every
+target strips CSS differently. All styling travels inline — there is no stylesheet on the
+clipboard.
+
+| Target | Notes |
+|---|---|
+| Rich text | Google Docs, Word, Slack. Mirrors the app's look. |
+| Email | Web-safe fonts only, light code blocks (dark mode inverts dark ones), `mso-*` hints for Outlook, table attributes, images displayed at ≤600px. |
+| Confluence | Structural HTML only — the editor discards CSS and re-styles by tag. Diagram wrappers become `<p>`, layout divs are unwrapped, `language-*` classes survive for the code macro. |
+| Markdown source | `text/plain` only; the raw editor content. |
+
+Adding a target means adding one `CopyTargetProfile` — no changes to the render pipeline.
+`maxImageWidth` caps how large a diagram *displays*; `maxRenderWidth` caps PNG resolution,
+trading zoom detail against clipboard payload size.
 
 ### MarkdownRenderer.tsx
 Uses react-markdown with:

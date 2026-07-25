@@ -501,6 +501,13 @@
   cursor: pointer;
 }
 
+.copy-popover-hint {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
 .copy-popover-row select:hover { border-color: var(--border-strong); }
 
 .copy-popover-row select:focus-visible {
