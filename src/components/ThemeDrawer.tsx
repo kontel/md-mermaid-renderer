@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import { THEMES } from 'beautiful-mermaid';
 import { useMermaidContext, type ThemeConfig, type ThemePreset } from '../context/MermaidContext';
 import { DEFAULT_THEME_CONFIG } from '../context/themeConfig';
+import { MERMAID_STYLES, STYLE_TOKENS, mermaidStyle } from '../lib/mermaidStyle';
+import type { MermaidStyleId, MermaidStylePreset } from '../lib/mermaidStyle';
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Fira Code', 'JetBrains Mono', 'system-ui', 'monospace'];
 
@@ -92,10 +95,68 @@ function NumberInput({ label, value, min, max, step = 1, onChange }: NumberInput
   );
 }
 
+const STYLE_GROUPS: MermaidStylePreset['group'][] = ['Classic', 'Neo', 'Redux', 'Studio'];
+
+/** A one-click preset tile showing the colours it will actually produce. */
+function StyleSwatch({
+  preset,
+  selected,
+  onSelect,
+}: {
+  preset: MermaidStylePreset;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const [surface, node, accent] = preset.swatch;
+  return (
+    <button
+      type="button"
+      className={`style-swatch ${selected ? 'is-selected' : ''}`}
+      onClick={onSelect}
+      aria-pressed={selected}
+      title={preset.hint}
+    >
+      <span className="style-swatch-preview" style={{ backgroundColor: surface }} aria-hidden="true">
+        <span className="style-swatch-node" style={{ backgroundColor: node, borderColor: accent }} />
+        <span className="style-swatch-edge" style={{ backgroundColor: accent }} />
+        <span className="style-swatch-node" style={{ backgroundColor: node, borderColor: accent }} />
+      </span>
+      <span className="style-swatch-label">{preset.label}</span>
+    </button>
+  );
+}
+
 export function ThemeDrawer() {
-  const { themeConfig, setThemeConfig, isDrawerOpen, setDrawerOpen, renderMode } = useMermaidContext();
+  const {
+    themeConfig,
+    setThemeConfig,
+    isDrawerOpen,
+    setDrawerOpen,
+    renderMode,
+    mermaidStyleId,
+    setMermaidStyleId,
+    styleTokens,
+    setStyleTokens,
+  } = useMermaidContext();
 
   const isBeautifulMode = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
+  const activeStyle = mermaidStyle(mermaidStyleId);
+
+  const setToken = (key: string, value: string) =>
+    setStyleTokens({ ...styleTokens, [key]: value });
+
+  const clearTokens = () => setStyleTokens({});
+  const tokenCount = Object.keys(styleTokens).length;
+
+  // No backdrop to click, so Escape is the only dismiss shortcut.
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isDrawerOpen, setDrawerOpen]);
 
   const handlePresetChange = (preset: ThemePreset) => {
     if (preset === 'custom') {
@@ -160,22 +221,95 @@ export function ThemeDrawer() {
 
   return (
     <>
-      <div className="theme-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
-      <div className="theme-drawer">
+      <div className="theme-drawer" role="region" aria-label="Diagram styling">
         <div className="theme-drawer-header">
-          <h2>Theme Customization</h2>
+          <h2>Diagram styling</h2>
           <button className="theme-drawer-close" onClick={() => setDrawerOpen(false)}>
             &times;
           </button>
         </div>
 
-        {!isBeautifulMode && (
-          <div className="theme-drawer-warning">
-            Theme customization only applies to Beautiful Mermaid render modes (SVG or ASCII).
-          </div>
-        )}
-
         <div className="theme-drawer-content">
+          <div className="theme-section">
+            <h3>
+              Style
+              <span className="theme-section-scope">
+                {isBeautifulMode ? 'Default renderer + fallbacks' : 'Active'}
+              </span>
+            </h3>
+            <p className="theme-section-note">{activeStyle.hint}</p>
+            {STYLE_GROUPS.map((group) => {
+              const presets = MERMAID_STYLES.filter((s) => s.group === group);
+              if (presets.length === 0) return null;
+              return (
+                <div key={group} className="style-swatch-group">
+                  <span className="style-swatch-group-label">{group}</span>
+                  <div className="style-swatch-grid">
+                    {presets.map((preset) => (
+                      <StyleSwatch
+                        key={preset.id}
+                        preset={preset}
+                        selected={preset.id === mermaidStyleId}
+                        onSelect={() => setMermaidStyleId(preset.id as MermaidStyleId)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="theme-section">
+            <h3>
+              Design tokens
+              {tokenCount > 0 && <span className="theme-section-scope">{tokenCount} overridden</span>}
+            </h3>
+            <p className="theme-section-note">
+              Set any value to override the style. Leave blank to inherit. Overrides switch the
+              diagram onto mermaid&apos;s <code>base</code> theme, which is the only one that reads
+              these variables.
+            </p>
+            {STYLE_TOKENS.map((token) =>
+              token.kind === 'color' ? (
+                <ColorInput
+                  key={token.key}
+                  label={token.label}
+                  value={styleTokens[token.key] ?? ''}
+                  onChange={(v) => setToken(token.key, v)}
+                />
+              ) : (
+                <div key={token.key} className="theme-font-select">
+                  <label htmlFor={`token-${token.key}`}>{token.label}</label>
+                  <input
+                    id={`token-${token.key}`}
+                    type="text"
+                    value={styleTokens[token.key] ?? ''}
+                    placeholder="inherit"
+                    onChange={(e) => setToken(token.key, e.target.value)}
+                  />
+                </div>
+              ),
+            )}
+            {tokenCount > 0 && (
+              <div className="theme-drawer-actions">
+                <button className="theme-btn theme-btn-reset" onClick={clearTokens}>
+                  Clear overrides
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="theme-section-divider">
+            <span>Beautiful renderer</span>
+          </div>
+
+          {!isBeautifulMode && (
+            <div className="theme-drawer-warning">
+              The settings below apply to the Beautiful and ASCII renderers. Switch renderer in the
+              header to see them take effect.
+            </div>
+          )}
+
           <div className="theme-section">
             <h3>Preset Theme</h3>
             <select

@@ -1,20 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { flowchartConfig } from '../config/flowchart';
+import { flowchartConfig, HTML_LABELS } from '../config/flowchart';
 import { useMermaidContext } from '../context/MermaidContext';
 import { computeBeautifulRender } from '../lib/mermaidTheme';
+import { buildMermaidStyleConfig, styleConfigKey } from '../lib/mermaidStyle';
 import { DiagramActions } from './DiagramActions';
 
 interface MermaidProps {
   chart: string;
 }
 
-mermaid.initialize({
+/** Everything except the visual style, which is re-applied per render. */
+const BASE_CONFIG = {
   startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
+  securityLevel: 'loose' as const,
+  htmlLabels: HTML_LABELS,
   flowchart: flowchartConfig,
-});
+};
+
+mermaid.initialize({ ...BASE_CONFIG, theme: 'default' });
+
+/**
+ * Registers every built-in diagram detector before the first render.
+ *
+ * Newer diagram types (venn, cynefin, swimlane, treeView, wardley, ishikawa,
+ * railroad) are registered lazily. A page that mounts several diagrams at once
+ * fires their `render` calls concurrently, and the ones that land before
+ * registration completes fail with "No diagram type detected" — they only
+ * appear after navigating away and back. Awaiting this first makes a cold load
+ * behave like a warm one.
+ *
+ * `lazyLoad: true` keeps the per-diagram chunks on demand; only the detectors
+ * are registered up front.
+ */
+const mermaidReady: Promise<void> = mermaid
+  .registerExternalDiagrams([], { lazyLoad: true })
+  .catch(() => undefined);
 
 let mermaidId = 0;
 function nextMermaidId() {
@@ -22,7 +43,7 @@ function nextMermaidId() {
 }
 
 export function Mermaid({ chart }: MermaidProps) {
-  const { renderMode, themeConfig } = useMermaidContext();
+  const { renderMode, themeConfig, mermaidStyleId, styleTokens } = useMermaidContext();
   const containerRef = useRef<HTMLElement>(null);
   const [defaultSvg, setDefaultSvg] = useState<string>('');
   const [defaultError, setDefaultError] = useState<string | null>(null);
@@ -32,8 +53,20 @@ export function Mermaid({ chart }: MermaidProps) {
     [chart, themeConfig, renderMode],
   );
 
+  /**
+   * beautiful-mermaid only understands the flowchart family. Rather than showing
+   * an error for a gantt or a mindmap, fall back to mermaid.js — a diagram in the
+   * wrong style beats no diagram.
+   */
+  const isFallback = renderMode !== 'default' && beautiful.error !== null;
+  const usesMermaidJs = renderMode === 'default' || isFallback;
+
+  // A plain string, so the effect re-runs on a real style change rather than on
+  // every render (the config object is rebuilt each time).
+  const styleKey = styleConfigKey(mermaidStyleId, styleTokens);
+
   useEffect(() => {
-    if (renderMode !== 'default') return;
+    if (!usesMermaidJs) return;
     if (!chart.trim()) {
       queueMicrotask(() => {
         setDefaultSvg('');
@@ -44,6 +77,11 @@ export function Mermaid({ chart }: MermaidProps) {
     let cancelled = false;
     const run = async () => {
       try {
+        await mermaidReady;
+        if (cancelled) return;
+        // Config is global in mermaid, and every diagram on the page shares this
+        // style, so re-applying it before each render is idempotent.
+        mermaid.initialize({ ...BASE_CONFIG, ...buildMermaidStyleConfig(mermaidStyleId, styleTokens) });
         const id = nextMermaidId();
         const { svg } = await mermaid.render(id, chart);
         if (!cancelled) {
@@ -61,11 +99,11 @@ export function Mermaid({ chart }: MermaidProps) {
     return () => {
       cancelled = true;
     };
-  }, [chart, renderMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- styleKey stands in for mermaidStyleId + styleTokens
+  }, [chart, usesMermaidJs, styleKey]);
 
-  const svg = renderMode === 'default' ? defaultSvg : beautiful.svg;
-  const ascii = beautiful.ascii;
-  const error = renderMode === 'default' ? defaultError : beautiful.error;
+  const svg = usesMermaidJs ? defaultSvg : beautiful.svg;
+  const error = usesMermaidJs ? defaultError : beautiful.error;
 
   if (error) {
     return (
@@ -75,11 +113,11 @@ export function Mermaid({ chart }: MermaidProps) {
     );
   }
 
-  if (renderMode === 'beautiful-ascii' && ascii) {
+  if (renderMode === 'beautiful-ascii' && beautiful.ascii) {
     return (
       <div className="mermaid-block">
         <pre ref={containerRef as React.RefObject<HTMLPreElement | null>} className="mermaid-ascii">
-          {ascii}
+          {beautiful.ascii}
         </pre>
         <DiagramActions containerRef={containerRef} />
       </div>
@@ -93,7 +131,14 @@ export function Mermaid({ chart }: MermaidProps) {
         className="mermaid-container"
         dangerouslySetInnerHTML={{ __html: svg }}
       />
-      <DiagramActions containerRef={containerRef} />
+      <div className="mermaid-block-footer">
+        {isFallback && (
+          <span className="mermaid-fallback-note" title="This renderer only supports the flowchart family">
+            Rendered with mermaid.js
+          </span>
+        )}
+        <DiagramActions containerRef={containerRef} />
+      </div>
     </div>
   );
 }

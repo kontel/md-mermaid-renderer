@@ -3,16 +3,21 @@ import type { ReactNode } from 'react';
 import type { CopyImageFontSize, LabelWrapAggressiveness } from '../utils/copyPreview';
 import { isValidCopyTarget } from '../lib/copyTargets';
 import type { CopyTarget } from '../lib/copyTargets';
+import { DEFAULT_MERMAID_STYLE, isValidMermaidStyle, sanitizeTokens } from '../lib/mermaidStyle';
+import type { MermaidStyleId } from '../lib/mermaidStyle';
 import {
   RENDER_MODE_STORAGE_KEY,
   THEME_CONFIG_STORAGE_KEY,
   LABEL_WRAP_STORAGE_KEY,
   COPY_IMAGE_FONT_SIZE_STORAGE_KEY,
   COPY_TARGET_STORAGE_KEY,
+  MERMAID_STYLE_STORAGE_KEY,
+  STYLE_TOKENS_STORAGE_KEY,
   isValidRenderMode,
   isValidLabelWrap,
   isValidCopyImageFontSize,
   loadThemeConfig,
+  loadStyleTokens,
 } from './mermaidStorage';
 import type { MermaidRenderMode, ThemeConfig } from './themeConfig';
 
@@ -32,6 +37,12 @@ interface MermaidContextType {
   setCopyImageFontSize: (size: CopyImageFontSize) => void;
   copyTarget: CopyTarget;
   setCopyTarget: (target: CopyTarget) => void;
+  /** Visual style for the mermaid.js renderer. */
+  mermaidStyleId: MermaidStyleId;
+  setMermaidStyleId: (id: MermaidStyleId) => void;
+  /** Design-token overrides layered on top of the selected style. */
+  styleTokens: Record<string, string>;
+  setStyleTokens: (tokens: Record<string, string>) => void;
 }
 
 const MermaidContext = createContext<MermaidContextType | undefined>(undefined);
@@ -62,9 +73,26 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(RENDER_MODE_STORAGE_KEY, renderMode);
   }, [renderMode]);
 
+  const [mermaidStyleId, setMermaidStyleId] = useState<MermaidStyleId>(() => {
+    const stored = localStorage.getItem(MERMAID_STYLE_STORAGE_KEY);
+    return isValidMermaidStyle(stored) ? stored : DEFAULT_MERMAID_STYLE;
+  });
+
+  const [styleTokens, setStyleTokensRaw] = useState<Record<string, string>>(loadStyleTokens);
+  const setStyleTokens = (tokens: Record<string, string>) =>
+    setStyleTokensRaw(sanitizeTokens(tokens));
+
   useEffect(() => {
     localStorage.setItem(COPY_TARGET_STORAGE_KEY, copyTarget);
   }, [copyTarget]);
+
+  useEffect(() => {
+    localStorage.setItem(MERMAID_STYLE_STORAGE_KEY, mermaidStyleId);
+  }, [mermaidStyleId]);
+
+  useEffect(() => {
+    localStorage.setItem(STYLE_TOKENS_STORAGE_KEY, JSON.stringify(styleTokens));
+  }, [styleTokens]);
 
   useEffect(() => {
     localStorage.setItem(LABEL_WRAP_STORAGE_KEY, labelWrapAggressiveness);
@@ -93,6 +121,10 @@ export function MermaidProvider({ children }: { children: ReactNode }) {
         setCopyImageFontSize,
         copyTarget,
         setCopyTarget,
+        mermaidStyleId,
+        setMermaidStyleId,
+        styleTokens,
+        setStyleTokens,
       }}
     >
       {children}

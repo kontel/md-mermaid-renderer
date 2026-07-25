@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ThemeDrawer } from './components/ThemeDrawer';
+import { ChangelogPopup } from './components/ChangelogPopup';
 import { HighlightedEditor } from './components/HighlightedEditor';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
@@ -8,337 +9,15 @@ import { copyPreview } from './utils/copyPreview';
 import type { CopyImageFontSize, CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
 import { COPY_TARGETS, copyTargetProfile } from './lib/copyTargets';
 import type { CopyTarget } from './lib/copyTargets';
+import { TABS } from './content/samples';
+import type { TabId } from './content/samples';
+import { mermaidStyle } from './lib/mermaidStyle';
 import './App.css';
 
 const STORAGE_KEY = 'md-mermaid-content';
 
 const AVATAR_SRC =
   import.meta.env.DEV ? '/kontel-avatar.png' : `${import.meta.env.BASE_URL}kontel-avatar.png`;
-
-function generateLargeFlow(): string {
-  const rows = 20;
-  const cols = 12;
-
-  const stages = [
-    'Ingest request',
-    'Parse headers',
-    'Authenticate JWT',
-    'Validate payload schema against strict contract v2',
-    'Rate limit?',
-    'Enrich with tenant + user context',
-    'Shard by tenant id',
-    'Queue for async worker',
-    'Transform',
-    'Apply rules engine?',
-    'Dedupe against recent window',
-    'Persist to primary datastore',
-    'Replicate cross-region asynchronously',
-    'Emit domain event',
-    'Invalidate caches',
-    'Notify downstream consumers via broker',
-    'Write audit trail with full request context',
-    'Collect metrics + distributed traces',
-    'Ack client',
-    'Archive',
-  ];
-
-  const lanes = [
-    'Payments',
-    'Notifications',
-    'Search index',
-    'Analytics ingest',
-    'Media transcode',
-    'Auth service',
-    'Inventory',
-    'Billing recon',
-    'Sync replication',
-    'Event bus',
-    'Cache warmer',
-    'Audit logger',
-  ];
-
-  const shapeOf = (r: number, label: string): string => {
-    const q = `"${label}"`;
-    if (r === 5 || r === 10) return `{${q}}`;
-    if (r === 12) return `[(${q})]`;
-    if (r === 7 || r === 16) return `[[${q}]]`;
-    if (r === 6 || r === 14) return `(${q})`;
-    return `[${q}]`;
-  };
-
-  const labelOf = (r: number, c: number): string => {
-    const stage = stages[r - 1];
-    const lane = lanes[c - 1];
-    const mix = (r * 31 + c * 17) % 13;
-    if (mix === 0) return `${lane} / ${stage} — extended notes about retries, idempotency and compensation`;
-    if (mix < 4) return `${lane} / ${stage}`;
-    if (mix < 7) return stage;
-    if (mix < 10) return `${lane} ${stage.toLowerCase()}`;
-    return lane;
-  };
-
-  const lines: string[] = ['flowchart TD'];
-
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      lines.push(`    N${r}_${c}${shapeOf(r, labelOf(r, c))}`);
-    }
-  }
-
-  for (let r = 1; r < rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      lines.push(`    N${r}_${c} --> N${r + 1}_${c}`);
-    }
-  }
-
-  for (const c of [1, 2, 7, 8, 11]) {
-    lines.push(`    N3_${c} -.->|verify| N4_6`);
-  }
-
-  for (const [c, target] of [[2, 1], [4, 3], [9, 8], [10, 9]] as const) {
-    lines.push(`    N5_${c} -->|reject| N6_${target}`);
-  }
-
-  for (const c of [1, 3, 5, 7, 9, 11]) {
-    lines.push(`    N7_${c} --> N8_${c + 1}`);
-  }
-
-  lines.push('    N10_3 -.->|retry| N7_3');
-  lines.push('    N10_8 -.->|retry| N7_8');
-
-  for (const c of [1, 3, 5, 7, 9]) {
-    lines.push(`    N12_${c} --> N13_12`);
-  }
-
-  for (let c = 1; c <= cols; c++) {
-    if (c === 3 || c === 11) continue;
-    const target = c % 2 === 0 ? 11 : 3;
-    lines.push(`    N14_${c} -.-> N15_${target}`);
-  }
-
-  for (const target of [2, 5, 6, 8, 9]) {
-    lines.push(`    N16_10 --> N17_${target}`);
-  }
-
-  for (let c = 1; c <= cols; c++) {
-    if (c !== 12) lines.push(`    N18_${c} -.-> N19_12`);
-  }
-
-  return lines.join('\n');
-}
-
-const largeFlowDiagram = generateLargeFlow();
-
-const mainMarkdown = `# Markdown with Mermaid Demo
-
-This is a **markdown** renderer with support for *inline* Mermaid diagrams.
-
-## Features
-
-- GitHub Flavored Markdown
-- Mermaid diagram rendering
-- Live preview
-
-## Flowchart Example
-
-\`\`\`mermaid
-flowchart TD
-    subgraph init["Setup & initialization<br/>of core services"]
-        A[Start]
-    end
-    subgraph check["Check very long status text without line breaks"]
-        B{Is it working?<br/>test}
-    end
-    subgraph actions["Actions<br/>& results"]
-        C[Great!]
-        D[Debug with long text without line breaks]
-    end
-    subgraph done["Finish"]
-        E[End]
-    end
-    A --> B
-    B -->|Yes| C
-    B -->|No| D
-    D --> B
-    C --> E
-\`\`\`
-
-## Simple Flow Diagram
-
-\`\`\`mermaid
-flowchart LR
-    A[Start] --> B{Choice}
-    B -->|One| C[Step 1]
-    B -->|Two| D[Step 2]
-    C --> E[End]
-    D --> E
-\`\`\`
-
-## Sequence Diagram
-
-\`\`\`mermaid
-sequenceDiagram
-    participant User
-    participant App
-    participant Server
-    User->>App: Enter markdown
-    App->>App: Parse & render
-    App->>Server: Save document
-    Server-->>App: Confirmation
-    App-->>User: Display preview
-\`\`\`
-
-## Code Example
-
-\`\`\`javascript
-function greet(name) {
-  return \`Hello, \${name}!\`;
-}
-\`\`\`
-
-## Table Example
-
-| Feature | Status |
-|---------|--------|
-| Markdown | ✅ |
-| Mermaid | ✅ |
-| GFM | ✅ |
-
-## Class Diagram
-
-\`\`\`mermaid
-classDiagram
-    class MarkdownRenderer {
-        +content: string
-        +render(): void
-    }
-    class Mermaid {
-        +chart: string
-        +render(): SVG
-    }
-    MarkdownRenderer --> Mermaid : uses
-\`\`\`
-`;
-
-const largeFlowMarkdown = `# Large Flow Diagram (12 × 20)
-
-A heavy flow used to exercise rendering performance. Isolated in its own tab so edits in the basic demo don't force it to re-render.
-
-\`\`\`mermaid
-${largeFlowDiagram}
-\`\`\`
-`;
-
-const galleryMarkdown = `# Diagram Gallery
-
-A quick tour of Mermaid's other diagram types — beyond the flowcharts, sequence, and class diagrams in the Basic tab.
-
-## State Diagram
-
-\`\`\`mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Loading: fetch
-    Loading --> Success: 200
-    Loading --> Error: fail
-    Success --> Idle: reset
-    Error --> Idle: retry
-    Success --> [*]
-\`\`\`
-
-## Entity Relationship
-
-\`\`\`mermaid
-erDiagram
-    CUSTOMER ||--o{ ORDER : places
-    ORDER ||--|{ LINE_ITEM : contains
-    PRODUCT ||--o{ LINE_ITEM : listed_in
-    CUSTOMER {
-        string name
-        string email
-    }
-    ORDER {
-        int id
-        date placed_at
-    }
-\`\`\`
-
-## Gantt Chart
-
-\`\`\`mermaid
-gantt
-    title Release plan
-    dateFormat YYYY-MM-DD
-    section Design
-    Mockups    :done,   2026-04-01, 5d
-    Review     :active, 2026-04-06, 2d
-    section Build
-    Implement  :        2026-04-08, 7d
-    QA         :        2026-04-15, 3d
-\`\`\`
-
-## Pie Chart
-
-\`\`\`mermaid
-pie title Traffic sources
-    "Organic" : 45
-    "Referral" : 30
-    "Direct" : 15
-    "Social" : 10
-\`\`\`
-
-## User Journey
-
-\`\`\`mermaid
-journey
-    title A day at the keyboard
-    section Morning
-      Stand-up:     3: Me
-      Code review:  4: Me
-    section Afternoon
-      Debug session: 2: Me
-      Ship it:       5: Me
-\`\`\`
-
-## Mindmap
-
-\`\`\`mermaid
-mindmap
-  root((Mermaid))
-    Flowcharts
-      Shapes
-      Arrows
-    Sequence
-      Actors
-      Messages
-    Other
-      Gantt
-      Pie
-      State
-\`\`\`
-
-## Git Graph
-
-\`\`\`mermaid
-gitGraph
-    commit
-    commit
-    branch feature
-    commit
-    commit
-    checkout main
-    merge feature
-    commit
-\`\`\`
-`;
-
-type TabId = 'main' | 'large' | 'gallery';
-
-const TABS: { id: TabId; label: string; defaultContent: string; storageKey: string }[] = [
-  { id: 'main', label: 'Basic', defaultContent: mainMarkdown, storageKey: 'md-mermaid-content-main' },
-  { id: 'large', label: 'Large flow', defaultContent: largeFlowMarkdown, storageKey: 'md-mermaid-content-large' },
-  { id: 'gallery', label: 'Gallery', defaultContent: galleryMarkdown, storageKey: 'md-mermaid-content-gallery' },
-];
 
 const RENDER_MODES: { value: MermaidRenderMode; label: string; hint: string }[] = [
   { value: 'default', label: 'Default', hint: 'Standard mermaid.js' },
@@ -347,8 +26,8 @@ const RENDER_MODES: { value: MermaidRenderMode; label: string; hint: string }[] 
 ];
 
 function RenderModeSelector() {
-  const { renderMode, setRenderMode, setDrawerOpen } = useMermaidContext();
-  const isBeautiful = renderMode === 'beautiful-svg' || renderMode === 'beautiful-ascii';
+  const { renderMode, setRenderMode, setDrawerOpen, mermaidStyleId } = useMermaidContext();
+  const activeStyle = mermaidStyle(mermaidStyleId);
 
   return (
     <>
@@ -365,15 +44,19 @@ function RenderModeSelector() {
           </button>
         ))}
       </div>
-      {isBeautiful && (
-        <button
-          className="theme-btn-trigger"
-          onClick={() => setDrawerOpen(true)}
-          title="Customize diagram colors and fonts"
-        >
-          Theme
-        </button>
-      )}
+      {/* Always available: the style applies to the default renderer too, which is
+          what most diagram types actually use. */}
+      <button
+        className="theme-btn-trigger"
+        onClick={() => setDrawerOpen(true)}
+        title={`Diagram styling — ${activeStyle.label}: ${activeStyle.hint}`}
+      >
+        <span className="theme-btn-swatch" aria-hidden="true">
+          <span style={{ backgroundColor: activeStyle.swatch[1] }} />
+          <span style={{ backgroundColor: activeStyle.swatch[2] }} />
+        </span>
+        {activeStyle.label}
+      </button>
     </>
   );
 }
@@ -680,6 +363,9 @@ function AppContent() {
           </button>
         </div>
       </header>
+      {/* The drawer is a sibling of main, not an overlay, so opening it shrinks
+          the panes instead of covering the preview you are restyling. */}
+      <div className="workspace">
       <main
         className="main"
         ref={mainRef}
@@ -739,7 +425,9 @@ function AppContent() {
           </div>
         </div>
       </main>
-      <ThemeDrawer />
+        <ThemeDrawer />
+      </div>
+      <ChangelogPopup />
     </div>
   );
 }

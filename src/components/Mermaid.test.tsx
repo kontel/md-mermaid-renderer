@@ -6,6 +6,8 @@ import mermaid from 'mermaid';
 vi.mock('mermaid', () => ({
   default: {
     initialize: vi.fn(),
+    // Resolves on a later microtask so a render that skipped the wait would be visible.
+    registerExternalDiagrams: vi.fn().mockResolvedValue(undefined),
     render: vi.fn().mockResolvedValue({ svg: '<svg>mocked</svg>', diagramType: 'flowchart' }),
   },
 }));
@@ -47,6 +49,16 @@ describe('Mermaid', () => {
   it('renders diagram actions', async () => {
     render(<Mermaid chart="graph TD\nA-->B" />);
     expect(screen.getAllByTestId('diagram-actions').length).toBeGreaterThan(0);
+  });
+
+  it('registers diagram detectors before rendering', async () => {
+    // Lazily-registered types (venn, cynefin, swimlane…) fail detection if a
+    // render lands before registration, so registration must be requested up front.
+    expect(vi.mocked(mermaid.registerExternalDiagrams)).toHaveBeenCalledWith([], { lazyLoad: true });
+
+    render(<Mermaid chart="graph TD\nA-->B" />);
+    await screen.findByText(/mocked/, {}, { timeout: 2000 });
+    expect(vi.mocked(mermaid.render)).toHaveBeenCalled();
   });
 
   it('renders error state for invalid chart in default mode', async () => {
