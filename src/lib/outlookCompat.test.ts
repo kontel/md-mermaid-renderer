@@ -69,6 +69,27 @@ describe('auditOutlookHtml', () => {
     expect(rules).toContain('table-bgcolor-needs-attribute');
   });
 
+  it('flags px font sizes and px margins', () => {
+    const root = bodyFrom(
+      '<h1 style="font-size:24px;margin-top:30px">T</h1>',
+    );
+    const rules = outlookErrors(root).map((i) => i.rule);
+    expect(rules).toContain('font-size-needs-points');
+    expect(rules).toContain('margin-needs-points');
+  });
+
+  it('flags the margin shorthand', () => {
+    const root = bodyFrom('<p style="margin:0 0 16px">x</p>');
+    expect(outlookErrors(root).map((i) => i.rule)).toContain('margin-shorthand-unreliable');
+  });
+
+  it('accepts point sizes with longhand margins', () => {
+    const root = bodyFrom(
+      '<h1 style="font-size:19pt;margin-top:20pt;margin-bottom:8pt;line-height:24pt">T</h1>',
+    );
+    expect(outlookErrors(root)).toEqual([]);
+  });
+
   it('reads clean when nothing is wrong', () => {
     const root = bodyFrom('<p style="line-height:25px">fine</p>');
     expect(formatOutlookReport(auditOutlookHtml(root))).toMatch(/No known Outlook/);
@@ -104,7 +125,7 @@ describe('the email profile against the Word engine', () => {
     const cell = img.closest('td');
     expect(cell).not.toBeNull();
     expect(cell!.getAttribute('align')).toBe('center');
-    expect(cell!.getAttribute('style')).toContain('border:1px solid');
+    expect(cell!.getAttribute('style')).toContain('border:1pt solid');
     expect(cell!.closest('table')!.getAttribute('align')).toBe('center');
   });
 
@@ -148,6 +169,77 @@ describe('the email profile against the Word engine', () => {
       expect(/line-height:\s*(\d+(\.\d+)?(px|pt))/.exec(style)?.[1], h.tagName).toBeDefined();
     }
     expect(outlookErrors(root)).toEqual([]);
+  });
+
+  it('keeps a visible size hierarchy between heading levels', () => {
+    // The reported symptom: every heading arrived at body size in Word because
+    // px font sizes were dropped. Sizes must be in pt and strictly decreasing.
+    const root = bodyFrom('<h1>a</h1><h2>b</h2><h3>c</h3><p>body</p>');
+    prepareDocument(root, copyTargetProfile('email'));
+
+    const sizePt = (sel: string) => {
+      const style = root.querySelector(sel)!.getAttribute('style') ?? '';
+      const m = /font-size:\s*([\d.]+)pt/.exec(style);
+      expect(m, `${sel} needs a pt font-size`).not.toBeNull();
+      return Number(m![1]);
+    };
+
+    const h1 = sizePt('h1');
+    const h2 = sizePt('h2');
+    const h3 = sizePt('h3');
+    const body = sizePt('p');
+
+    expect(h1).toBeGreaterThan(h2);
+    expect(h2).toBeGreaterThan(h3);
+    expect(h3).toBeGreaterThan(body);
+    // A hierarchy nobody can see is no hierarchy at all.
+    expect(h1 - body).toBeGreaterThanOrEqual(4);
+  });
+
+  it('gives every block a longhand pt gap beneath it', () => {
+    // A trailing block so none of the three under test is last — the final
+    // element's bottom margin is trimmed on purpose.
+    const root = bodyFrom('<p>a</p><ul><li>x</li></ul><blockquote>q</blockquote><p>tail</p>');
+    prepareDocument(root, copyTargetProfile('email'));
+
+    for (const sel of ['p', 'ul', 'blockquote']) {
+      const style = root.querySelector(sel)!.getAttribute('style') ?? '';
+      expect(style, sel).toMatch(/margin-bottom:\s*[\d.]+pt/);
+      expect(style, sel).toContain('mso-margin-bottom-alt');
+    }
+  });
+
+  it('brackets tables with spacer paragraphs Word cannot collapse', () => {
+    // Word ignores vertical margins on tables outright.
+    const root = representativeDocument();
+    prepareDocument(root, copyTargetProfile('email'));
+
+    for (const table of root.querySelectorAll('table')) {
+      if (table.parentElement?.closest('table')) continue;
+      expect(table.previousElementSibling?.hasAttribute('data-copy-spacer')).toBe(true);
+      expect(table.nextElementSibling?.hasAttribute('data-copy-spacer')).toBe(true);
+    }
+  });
+
+  it('never gives a content table align="left"', () => {
+    // align="left" floats a table in HTML, so following blocks wrap beside it
+    // instead of clearing it. Left is the default anyway; only the figure
+    // wrapper opts into align="center".
+    const root = representativeDocument();
+    prepareDocument(root, copyTargetProfile('email'));
+
+    for (const table of root.querySelectorAll('table')) {
+      expect(table.getAttribute('align'), table.outerHTML.slice(0, 60)).not.toBe('left');
+    }
+    const figureTable = root.querySelector('img')!.closest('table')!;
+    expect(figureTable.getAttribute('align')).toBe('center');
+  });
+
+  it('does not start a Word font stack with a vendor token', () => {
+    // A leading `-apple-system` can make Word discard the whole declaration and
+    // fall back to Calibri.
+    const family = /font-family:([^;]+)/.exec(copyTargetProfile('email').rootStyle)?.[1] ?? '';
+    expect(family.trim().startsWith('-')).toBe(false);
   });
 
   it('leaves the other targets alone', () => {

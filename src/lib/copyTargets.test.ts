@@ -44,7 +44,9 @@ describe('copy target profiles', () => {
       for (const selector of ['p', 'ul, ol', 'blockquote']) {
         const rule = profile.rules.find(([s]) => s === selector);
         expect(rule, `${target} is missing a rule for ${selector}`).toBeDefined();
-        expect(rule![1]).toMatch(/margin:[^;]*/);
+        // Shorthand or longhand, as long as a bottom gap is stated. The email
+        // profile must use longhand — Word discards the shorthand.
+        expect(rule![1]).toMatch(/margin(-bottom)?:[^;]*/);
       }
     }
   });

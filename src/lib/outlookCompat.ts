@@ -54,6 +54,36 @@ export function auditOutlookHtml(root: Element): OutlookIssue[] {
       }
     }
 
+    // 1b. Word works in points. It drops px font sizes, which is what made every
+    // heading arrive at body size, and mishandles the `margin` shorthand.
+    const fontSize = decl.get('font-size');
+    if (fontSize && /\d\s*px\s*$/i.test(fontSize)) {
+      issues.push({
+        severity: 'error',
+        rule: 'font-size-needs-points',
+        detail: `<${tag}> sets font-size:${fontSize}; Word drops px sizes and falls back to its own style`,
+      });
+    }
+
+    if (decl.has('margin') && tag !== 'img') {
+      issues.push({
+        severity: 'error',
+        rule: 'margin-shorthand-unreliable',
+        detail: `<${tag}> uses the margin shorthand; Word needs margin-top/margin-bottom longhand`,
+      });
+    }
+
+    for (const side of ['margin-top', 'margin-bottom'] as const) {
+      const value = decl.get(side);
+      if (value && /\d\s*px\s*$/i.test(value)) {
+        issues.push({
+          severity: 'error',
+          rule: 'margin-needs-points',
+          detail: `<${tag}> sets ${side}:${value}; Word ignores px margins so the gap disappears`,
+        });
+      }
+    }
+
     if (tag === 'img') {
       // 2. Word ignores max-width, so an image needs real dimensions.
       if (!el.getAttribute('width')) {
@@ -88,8 +118,21 @@ export function auditOutlookHtml(root: Element): OutlookIssue[] {
       });
     }
 
-    // 4. A CSS-only table width is frequently dropped.
+    // 4. A CSS-only table width is frequently dropped, and Word ignores vertical
+    //    margins on tables entirely — spacing has to come from a sibling.
     if (tag === 'table') {
+      const outermost = !el.parentElement?.closest('table');
+      if (outermost) {
+        const spaced = (sib: Element | null) =>
+          sib === null || sib.hasAttribute('data-copy-spacer') || sib.tagName.toLowerCase() === 'p';
+        if (!spaced(el.previousElementSibling) || !spaced(el.nextElementSibling)) {
+          issues.push({
+            severity: 'warning',
+            rule: 'table-needs-spacer',
+            detail: '<table> has no spacer paragraph beside it; Word ignores table margins',
+          });
+        }
+      }
       const width = decl.get('width');
       if (width && !el.getAttribute('width')) {
         issues.push({

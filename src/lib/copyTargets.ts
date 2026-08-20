@@ -58,7 +58,7 @@ const RICH_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ari
 const RICH_MONO = "'Fira Code', Consolas, Monaco, monospace";
 
 /** Outlook renders with Word, which only sees locally installed fonts. */
-const EMAIL_SANS = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const EMAIL_SANS = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const EMAIL_MONO = "Consolas, 'Courier New', Courier, monospace";
 
 const CONFLUENCE_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -140,52 +140,67 @@ const RICH: CopyTargetProfile = {
  * - 600px image cap: the widest a message body reliably renders without horizontal scroll.
  * - Web-safe monospace: Fira Code is not installed on the recipient's machine.
  */
+/**
+ * Vertical margins in the shape Word actually reads.
+ *
+ * Word's HTML parser works in points and drops `px` sizes, and it mishandles the
+ * `margin` shorthand — which is why headings arrived at body size with no gaps.
+ * Longhand pt properties, plus the `mso-margin-*-alt` pair Word's own HTML export
+ * emits, are what survive the round trip.
+ */
+function emailMargin(topPt: number, bottomPt: number): string {
+  return (
+    `margin-top:${topPt}pt;margin-right:0;margin-bottom:${bottomPt}pt;margin-left:0;` +
+    `mso-margin-top-alt:${topPt}pt;mso-margin-bottom-alt:${bottomPt}pt`
+  );
+}
+
 const EMAIL: CopyTargetProfile = {
   id: 'email',
   label: 'Email',
-  hint: 'Gmail, Outlook — web-safe fonts, absolute line heights, 600px images.',
+  hint: 'Gmail, Outlook — point sizes and longhand margins Word understands.',
   emitsHtml: true,
   rootStyle:
-    `color:#24292e;font-family:${EMAIL_SANS};font-size:15px;line-height:25px;` +
+    `color:#24292e;font-family:${EMAIL_SANS};font-size:11pt;line-height:16.5pt;` +
     `-webkit-text-size-adjust:100%;mso-line-height-rule:exactly`,
   rules: [
-    ['p', 'margin:0 0 16px;line-height:25px;mso-line-height-rule:exactly'],
-    ['h1, h2, h3, h4, h5, h6', 'margin:30px 0 12px;font-weight:700;color:#111827;mso-line-height-rule:exactly'],
-    ['h1', 'font-size:24px;line-height:32px;border-bottom:1px solid #e5e7eb;padding-bottom:8px'],
-    ['h2', 'font-size:20px;line-height:27px;border-bottom:1px solid #e5e7eb;padding-bottom:6px'],
-    ['h3', 'font-size:17px;line-height:24px'],
-    ['h4, h5, h6', 'font-size:15px;line-height:22px'],
-    ['ul, ol', 'margin:0 0 16px;padding-left:26px'],
-    ['li', 'margin:0 0 8px;line-height:24px;mso-line-height-rule:exactly'],
-    ['li > ul, li > ol', 'margin:8px 0 0'],
-    ['blockquote', 'margin:0 0 16px;padding:2px 0 2px 16px;border-left:3px solid #d0d7de;color:#57606a'],
-    ['hr', 'border:0;border-top:1px solid #e5e7eb;height:1px;line-height:1px;margin:28px 0'],
+    ['p', `${emailMargin(0, 10)};font-size:11pt;line-height:16.5pt;mso-line-height-rule:exactly`],
+    ['h1, h2, h3, h4, h5, h6', 'font-weight:700;color:#111827;mso-line-height-rule:exactly'],
+    ['h1', `${emailMargin(20, 8)};font-size:19pt;line-height:24pt;border-bottom:1pt solid #e5e7eb;padding-bottom:6pt`],
+    ['h2', `${emailMargin(18, 7)};font-size:15pt;line-height:20pt;border-bottom:1pt solid #e5e7eb;padding-bottom:5pt`],
+    ['h3', `${emailMargin(16, 6)};font-size:13pt;line-height:17pt`],
+    ['h4, h5, h6', `${emailMargin(14, 5)};font-size:11pt;line-height:15pt`],
+    ['ul, ol', `${emailMargin(0, 10)};padding-left:20pt`],
+    ['li', `${emailMargin(0, 5)};font-size:11pt;line-height:16pt;mso-line-height-rule:exactly`],
+    ['li > ul, li > ol', `${emailMargin(5, 0)}`],
+    ['blockquote', `${emailMargin(0, 10)};padding-left:12pt;border-left:2pt solid #d0d7de;color:#57606a`],
+    ['hr', `${emailMargin(16, 16)};border:0;border-top:1pt solid #e5e7eb;height:1pt;line-height:1pt`],
     ['a', 'color:#0b5fff;text-decoration:underline'],
     ['strong, b', 'font-weight:700'],
-    ['table', 'border-collapse:collapse;width:100%;margin:0 0 20px;font-size:14px;mso-table-lspace:0;mso-table-rspace:0'],
-    ['th, td', 'padding:9px 12px;border:1px solid #d0d7de;text-align:left;vertical-align:top;line-height:21px'],
+    ['table', `${emailMargin(0, 12)};border-collapse:collapse;width:100%;font-size:10.5pt;mso-table-lspace:0;mso-table-rspace:0`],
+    ['th, td', 'padding:6pt 9pt;border:1pt solid #d0d7de;text-align:left;vertical-align:top;font-size:10.5pt;line-height:15pt'],
     ['th', 'background-color:#f6f8fa;font-weight:700'],
     [
       '.code-block',
-      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;padding:14px 16px;` +
-        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:13px;line-height:20px;` +
+      `${emailMargin(0, 12)};background-color:#f6f8fa;color:#24292e;border:1pt solid #d0d7de;padding:9pt 11pt;` +
+        `font-family:${EMAIL_MONO};font-size:9.5pt;line-height:14pt;` +
         'mso-line-height-rule:exactly;white-space:pre-wrap;word-wrap:break-word;word-break:break-word',
     ],
     ['.code-block code', 'background:none;padding:0;color:inherit;font-family:inherit;font-size:inherit'],
     [
       '.inline-code',
-      `background-color:#f0f2f5;border:1px solid #e3e6ea;padding:1px 5px;` +
-        `font-family:${EMAIL_MONO};font-size:13px;color:#24292e`,
+      `background-color:#f0f2f5;border:1pt solid #e3e6ea;padding:0 3pt;` +
+        `font-family:${EMAIL_MONO};font-size:9.5pt;color:#24292e`,
     ],
     [
       '.mermaid-ascii',
-      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;padding:14px 16px;` +
-        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:12px;line-height:17px;` +
+      `${emailMargin(0, 12)};background-color:#f6f8fa;color:#24292e;border:1pt solid #d0d7de;padding:9pt 11pt;` +
+        `font-family:${EMAIL_MONO};font-size:9pt;line-height:12pt;` +
         'mso-line-height-rule:exactly;white-space:pre',
     ],
     [
       '.mermaid-error',
-      'background-color:#fff5f5;border:1px solid #f97583;padding:12px 16px;margin:0 0 16px;color:#cb2431;font-size:14px;line-height:21px',
+      `${emailMargin(0, 10)};background-color:#fff5f5;border:1pt solid #f97583;padding:9pt 11pt;color:#cb2431;font-size:10.5pt;line-height:15pt`,
     ],
     ['img', 'max-width:100%;border:0;outline:none;display:block;-ms-interpolation-mode:bicubic'],
   ],
@@ -196,10 +211,10 @@ const EMAIL: CopyTargetProfile = {
   maxRenderWidth: 2400,
   figure: {
     tag: 'div',
-    style: 'display:block;text-align:center;margin:22px 0',
+    style: 'display:block;text-align:center',
   },
   figureCellStyle:
-    'padding:14px;background-color:#ffffff;border:1px solid #e1e4e8;text-align:center',
+    'padding:10pt;background-color:#ffffff;border:1pt solid #e1e4e8;text-align:center',
   tableAttributes: true,
   structuralOnly: false,
   outlookCompat: true,

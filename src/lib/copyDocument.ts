@@ -17,6 +17,9 @@ const KEEP_CLASS_PREFIX = 'language-';
  */
 const FIGURE_MARKER = 'data-copy-figure';
 
+/** Marks generated spacer paragraphs so they are not doubled up. */
+const SPACER_MARKER = 'data-copy-spacer';
+
 /**
  * Parse an inline style string into declarations.
  *
@@ -83,8 +86,10 @@ function applyTableAttributes(root: HTMLElement, outlookCompat: boolean): void {
     if (/width:\s*100%/.test(table.getAttribute('style') ?? '')) {
       table.setAttribute('width', '100%');
     }
-    // Content tables read left; the figure wrapper already asked to be centred.
-    if (!table.hasAttribute('align')) table.setAttribute('align', 'left');
+    // Deliberately no align="left" here: in HTML that *floats* the table, so
+    // whatever follows wraps alongside it instead of clearing it. Block-level
+    // and left-aligned is already the default. Only the figure wrapper opts into
+    // align="center", which centres rather than floats.
   }
 }
 
@@ -118,7 +123,11 @@ function wrapFiguresInTables(root: HTMLElement, cellStyle: string): void {
     table.setAttribute('cellspacing', '0');
     table.setAttribute('border', '0');
     table.setAttribute('align', 'center');
-    mergeStyle(table, 'border-collapse:collapse;margin:22px auto;mso-table-lspace:0;mso-table-rspace:0');
+    mergeStyle(
+      table,
+      'border-collapse:collapse;margin-top:0;margin-right:auto;margin-bottom:0;margin-left:auto;' +
+        'mso-table-lspace:0;mso-table-rspace:0',
+    );
 
     const tbody = doc.createElement('tbody');
     const tr = doc.createElement('tr');
@@ -131,6 +140,40 @@ function wrapFiguresInTables(root: HTMLElement, cellStyle: string): void {
     tbody.appendChild(tr);
     table.appendChild(tbody);
     figure.replaceWith(table);
+  }
+}
+
+/**
+ * Put an empty paragraph either side of every table.
+ *
+ * Word ignores `margin` on `<table>` outright, so a diagram card or data table
+ * ends up flush against the paragraphs around it. An empty paragraph is the one
+ * vertical gap Word always honours. Sized in pt and marked so the spacers can be
+ * recognised again.
+ */
+function insertTableSpacers(root: HTMLElement, gapPt: number): void {
+  const doc = root.ownerDocument;
+  const makeSpacer = () => {
+    const spacer = doc.createElement('p');
+    spacer.setAttribute(SPACER_MARKER, '');
+    spacer.setAttribute(
+      'style',
+      `margin-top:0;margin-right:0;margin-bottom:0;margin-left:0;` +
+        `mso-margin-top-alt:0;mso-margin-bottom-alt:0;` +
+        `font-size:${gapPt}pt;line-height:${gapPt}pt;mso-line-height-rule:exactly`,
+    );
+    // A bare empty paragraph is collapsed by several clients; nbsp survives.
+    spacer.innerHTML = '&nbsp;';
+    return spacer;
+  };
+
+  for (const table of root.querySelectorAll('table')) {
+    // Only outermost tables: a nested one is already inside a spaced block.
+    if (table.parentElement?.closest('table')) continue;
+    const before = table.previousElementSibling;
+    if (!before?.hasAttribute(SPACER_MARKER)) table.before(makeSpacer());
+    const after = table.nextElementSibling;
+    if (!after?.hasAttribute(SPACER_MARKER)) table.after(makeSpacer());
   }
 }
 
@@ -176,8 +219,9 @@ function normalizeForConfluence(root: HTMLElement): void {
  * already in the document instead of opening with a stray blank line.
  */
 function trimEdgeMargins(root: HTMLElement): void {
-  const first = root.firstElementChild;
-  const last = root.lastElementChild;
+  const children = [...root.children].filter((el) => !el.hasAttribute(SPACER_MARKER));
+  const first = children[0];
+  const last = children[children.length - 1];
   if (first) mergeStyle(first, 'margin-top:0');
   if (last) mergeStyle(last, 'margin-bottom:0');
 }
@@ -200,7 +244,10 @@ export function prepareDocument(root: HTMLElement, profile: CopyTargetProfile): 
     figure.removeAttribute(FIGURE_MARKER);
   }
   if (profile.tableAttributes) applyTableAttributes(root, profile.outlookCompat);
-  if (profile.outlookCompat) mirrorBackgroundsToAttribute(root);
+  if (profile.outlookCompat) {
+    mirrorBackgroundsToAttribute(root);
+    insertTableSpacers(root, 6);
+  }
   if (profile.structuralOnly) normalizeForConfluence(root);
 
   trimEdgeMargins(root);

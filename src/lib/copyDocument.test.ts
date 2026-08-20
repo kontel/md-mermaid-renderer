@@ -57,11 +57,12 @@ describe('applyProfile', () => {
     const root = bodyFrom('<p>one</p><ul><li>a</li></ul><blockquote>q</blockquote>');
     applyProfile(root, copyTargetProfile('email'));
 
-    // Absolute, not unitless: Word reads mso-line-height-rule as a measure.
-    expect(root.getAttribute('style')).toContain('line-height:25px');
-    expect(root.querySelector('p')!.getAttribute('style')).toContain('margin:0 0 16px');
-    expect(root.querySelector('ul')!.getAttribute('style')).toContain('padding-left:26px');
-    expect(root.querySelector('li')!.getAttribute('style')).toContain('margin:0 0 8px');
+    // Points and longhand margins: Word drops px sizes and mishandles the
+    // margin shorthand, which left every heading at body size with no gaps.
+    expect(root.getAttribute('style')).toContain('line-height:16.5pt');
+    expect(root.querySelector('p')!.getAttribute('style')).toContain('margin-bottom:10pt');
+    expect(root.querySelector('ul')!.getAttribute('style')).toContain('padding-left:20pt');
+    expect(root.querySelector('li')!.getAttribute('style')).toContain('margin-bottom:5pt');
     expect(root.querySelector('blockquote')!.getAttribute('style')).toContain('border-left');
   });
 
@@ -71,7 +72,7 @@ describe('applyProfile', () => {
     const style = root.querySelector('h1')!.getAttribute('style')!;
     // The shared heading rule sets colour; the h1 rule adds its own size on top.
     expect(style).toContain('color:#111827');
-    expect(style).toContain('font-size:24px');
+    expect(style).toContain('font-size:19pt');
   });
 
   it('stripes even rows only for targets that keep backgrounds', () => {

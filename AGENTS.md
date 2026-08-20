@@ -112,9 +112,21 @@ silently — no console, no error, just wrong output. Gmail can look perfect whi
 Outlook is broken, so the email profile is written against Word's constraints and
 `outlookCompat.ts` lints the generated HTML for the traps that have actually bitten:
 
-- `mso-line-height-rule:exactly` is an **absolute** measure to Word. Pairing it
-  with a unitless `line-height:1.65` renders as ~1.65pt and collapses the text.
-  Every email line-height is therefore in px.
+- **Word works in points and drops `px` sizes.** This is what made every heading
+  arrive at body size with no gaps while Gmail looked perfect. Font sizes, line
+  heights and margins in the email profile are all in `pt`.
+- **Word mishandles the `margin` shorthand.** Margins are longhand
+  (`margin-top`/`margin-bottom`) plus the `mso-margin-*-alt` pair that Word's own
+  HTML export emits. `emailMargin()` builds both.
+- `mso-line-height-rule:exactly` is an **absolute** measure to Word, so it must
+  never sit beside a unitless `line-height`.
+- **Word ignores vertical margins on `<table>` entirely.** Diagrams and data
+  tables are bracketed by 6pt spacer paragraphs — the one gap Word always honours.
+- **Never set `align="left"` on a table**: in HTML that *floats* it, so the next
+  block wraps alongside instead of clearing it. Left is the default; only the
+  figure wrapper opts into `align="center"`.
+- A font stack must not begin with a vendor token like `-apple-system`; Word can
+  discard the whole declaration and fall back to Calibri.
 - Word ignores `max-width` and scales attribute-less images by system DPI, so
   images carry explicit `width` **and** `height`.
 - Borders and padding on `<div>` are unreliable; the diagram card is a
