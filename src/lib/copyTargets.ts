@@ -35,10 +35,23 @@ export interface CopyTargetProfile {
   maxRenderWidth: number;
   /** Wrapper around each diagram image. Confluence prefers a plain paragraph over a styled div. */
   figure: { tag: 'div' | 'p'; style: string };
+  /**
+   * Card styling for the figure, applied to a table cell under `outlookCompat`.
+   * Word paints borders and padding on `<td>` reliably and on `<div>` erratically,
+   * so the frame lives here rather than in `figure.style`.
+   */
+  figureCellStyle?: string;
   /** Add cellpadding/cellspacing/border attributes — Outlook's Word engine ignores CSS on tables. */
   tableAttributes: boolean;
   /** Drop presentational classes and unwrap layout divs; the target re-styles everything itself. */
   structuralOnly: boolean;
+  /**
+   * Emit markup for Outlook's Word rendering engine: images sized by attribute,
+   * figures wrapped in tables, backgrounds mirrored onto `bgcolor`. Word ignores
+   * `max-width`, is unreliable with padding and borders on `<div>`, and often
+   * drops CSS table widths.
+   */
+  outlookCompat: boolean;
 }
 
 const RICH_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
@@ -109,6 +122,7 @@ const RICH: CopyTargetProfile = {
   },
   tableAttributes: false,
   structuralOnly: false,
+  outlookCompat: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -119,56 +133,61 @@ const RICH: CopyTargetProfile = {
  * Email choices that differ from rich text, and why:
  * - Light code blocks: clients that force dark mode invert backgrounds, which turns
  *   a dark block into unreadable light-on-light.
- * - `mso-line-height-rule:exactly` — Word ignores fractional line-height without it.
+ * - Absolute line heights in px: Word reads `mso-line-height-rule:exactly` as an
+ *   absolute measure, so a unitless 1.65 there renders as roughly 1.65pt and the
+ *   text collapses on itself. Gmail ignores `mso-*`, which is why this only ever
+ *   showed up in Outlook.
  * - 600px image cap: the widest a message body reliably renders without horizontal scroll.
  * - Web-safe monospace: Fira Code is not installed on the recipient's machine.
  */
 const EMAIL: CopyTargetProfile = {
   id: 'email',
   label: 'Email',
-  hint: 'Gmail, Outlook — web-safe fonts, light code, 600px images.',
+  hint: 'Gmail, Outlook — web-safe fonts, absolute line heights, 600px images.',
   emitsHtml: true,
   rootStyle:
-    `color:#24292e;font-family:${EMAIL_SANS};font-size:15px;line-height:1.65;` +
+    `color:#24292e;font-family:${EMAIL_SANS};font-size:15px;line-height:25px;` +
     `-webkit-text-size-adjust:100%;mso-line-height-rule:exactly`,
   rules: [
-    ['p', 'margin:0 0 16px;line-height:1.65;mso-line-height-rule:exactly'],
-    ['h1, h2, h3, h4, h5, h6', 'margin:30px 0 12px;font-weight:700;line-height:1.3;color:#111827'],
-    ['h1', 'font-size:24px;border-bottom:1px solid #e5e7eb;padding-bottom:8px'],
-    ['h2', 'font-size:20px;border-bottom:1px solid #e5e7eb;padding-bottom:6px'],
-    ['h3', 'font-size:17px'],
-    ['h4, h5, h6', 'font-size:15px'],
+    ['p', 'margin:0 0 16px;line-height:25px;mso-line-height-rule:exactly'],
+    ['h1, h2, h3, h4, h5, h6', 'margin:30px 0 12px;font-weight:700;color:#111827;mso-line-height-rule:exactly'],
+    ['h1', 'font-size:24px;line-height:32px;border-bottom:1px solid #e5e7eb;padding-bottom:8px'],
+    ['h2', 'font-size:20px;line-height:27px;border-bottom:1px solid #e5e7eb;padding-bottom:6px'],
+    ['h3', 'font-size:17px;line-height:24px'],
+    ['h4, h5, h6', 'font-size:15px;line-height:22px'],
     ['ul, ol', 'margin:0 0 16px;padding-left:26px'],
-    ['li', 'margin:0 0 8px;line-height:1.6'],
+    ['li', 'margin:0 0 8px;line-height:24px;mso-line-height-rule:exactly'],
     ['li > ul, li > ol', 'margin:8px 0 0'],
     ['blockquote', 'margin:0 0 16px;padding:2px 0 2px 16px;border-left:3px solid #d0d7de;color:#57606a'],
     ['hr', 'border:0;border-top:1px solid #e5e7eb;height:1px;line-height:1px;margin:28px 0'],
     ['a', 'color:#0b5fff;text-decoration:underline'],
     ['strong, b', 'font-weight:700'],
     ['table', 'border-collapse:collapse;width:100%;margin:0 0 20px;font-size:14px;mso-table-lspace:0;mso-table-rspace:0'],
-    ['th, td', 'padding:9px 12px;border:1px solid #d0d7de;text-align:left;vertical-align:top'],
+    ['th, td', 'padding:9px 12px;border:1px solid #d0d7de;text-align:left;vertical-align:top;line-height:21px'],
     ['th', 'background-color:#f6f8fa;font-weight:700'],
     [
       '.code-block',
-      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;border-radius:6px;padding:14px 16px;` +
-        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word`,
+      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;padding:14px 16px;` +
+        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:13px;line-height:20px;` +
+        'mso-line-height-rule:exactly;white-space:pre-wrap;word-wrap:break-word;word-break:break-word',
     ],
     ['.code-block code', 'background:none;padding:0;color:inherit;font-family:inherit;font-size:inherit'],
     [
       '.inline-code',
-      `background-color:#f0f2f5;border:1px solid #e3e6ea;padding:1px 5px;border-radius:4px;` +
+      `background-color:#f0f2f5;border:1px solid #e3e6ea;padding:1px 5px;` +
         `font-family:${EMAIL_MONO};font-size:13px;color:#24292e`,
     ],
     [
       '.mermaid-ascii',
-      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;border-radius:6px;padding:14px 16px;` +
-        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:12px;line-height:1.4;white-space:pre;overflow-x:auto`,
+      `background-color:#f6f8fa;color:#24292e;border:1px solid #d0d7de;padding:14px 16px;` +
+        `margin:0 0 16px;font-family:${EMAIL_MONO};font-size:12px;line-height:17px;` +
+        'mso-line-height-rule:exactly;white-space:pre',
     ],
     [
       '.mermaid-error',
-      'background-color:#fff5f5;border:1px solid #f97583;border-radius:6px;padding:12px 16px;margin:0 0 16px;color:#cb2431;font-size:14px',
+      'background-color:#fff5f5;border:1px solid #f97583;padding:12px 16px;margin:0 0 16px;color:#cb2431;font-size:14px;line-height:21px',
     ],
-    ['img', 'max-width:100%;height:auto;border:0;outline:none;display:block;margin:0 auto;-ms-interpolation-mode:bicubic'],
+    ['img', 'max-width:100%;border:0;outline:none;display:block;-ms-interpolation-mode:bicubic'],
   ],
   zebraStripe: 'background-color:#f9fafb',
   maxImageWidth: 600,
@@ -177,11 +196,13 @@ const EMAIL: CopyTargetProfile = {
   maxRenderWidth: 2400,
   figure: {
     tag: 'div',
-    style:
-      'display:block;text-align:center;margin:22px 0;padding:14px;background-color:#ffffff;border:1px solid #e1e4e8;border-radius:6px',
+    style: 'display:block;text-align:center;margin:22px 0',
   },
+  figureCellStyle:
+    'padding:14px;background-color:#ffffff;border:1px solid #e1e4e8;text-align:center',
   tableAttributes: true,
   structuralOnly: false,
+  outlookCompat: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -236,6 +257,7 @@ const CONFLUENCE: CopyTargetProfile = {
   figure: { tag: 'p', style: 'text-align:center;margin:16px 0' },
   tableAttributes: false,
   structuralOnly: true,
+  outlookCompat: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -255,6 +277,7 @@ const MARKDOWN: CopyTargetProfile = {
   figure: { tag: 'div', style: '' },
   tableAttributes: false,
   structuralOnly: false,
+  outlookCompat: false,
 };
 
 export const COPY_TARGET_PROFILES: Record<CopyTarget, CopyTargetProfile> = {

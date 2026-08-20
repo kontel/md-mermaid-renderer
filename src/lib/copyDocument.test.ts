@@ -57,7 +57,8 @@ describe('applyProfile', () => {
     const root = bodyFrom('<p>one</p><ul><li>a</li></ul><blockquote>q</blockquote>');
     applyProfile(root, copyTargetProfile('email'));
 
-    expect(root.getAttribute('style')).toContain('line-height:1.65');
+    // Absolute, not unitless: Word reads mso-line-height-rule as a measure.
+    expect(root.getAttribute('style')).toContain('line-height:25px');
     expect(root.querySelector('p')!.getAttribute('style')).toContain('margin:0 0 16px');
     expect(root.querySelector('ul')!.getAttribute('style')).toContain('padding-left:26px');
     expect(root.querySelector('li')!.getAttribute('style')).toContain('margin:0 0 8px');

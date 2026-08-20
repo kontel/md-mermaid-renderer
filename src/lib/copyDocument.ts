@@ -72,11 +72,65 @@ export function applyProfile(root: HTMLElement, profile: CopyTargetProfile): voi
 }
 
 /** Outlook's Word engine ignores `border-collapse`; the old attributes still work. */
-function applyTableAttributes(root: HTMLElement): void {
+function applyTableAttributes(root: HTMLElement, outlookCompat: boolean): void {
   for (const table of root.querySelectorAll('table')) {
     table.setAttribute('cellpadding', '0');
     table.setAttribute('cellspacing', '0');
     table.setAttribute('border', '0');
+
+    if (!outlookCompat) continue;
+    // Word frequently drops `width:100%` from CSS but honours the attribute.
+    if (/width:\s*100%/.test(table.getAttribute('style') ?? '')) {
+      table.setAttribute('width', '100%');
+    }
+    // Content tables read left; the figure wrapper already asked to be centred.
+    if (!table.hasAttribute('align')) table.setAttribute('align', 'left');
+  }
+}
+
+/**
+ * Mirror inline `background-color` onto `bgcolor`.
+ *
+ * Word's support for CSS backgrounds on table rows and cells is patchy, so the
+ * legacy attribute is what actually paints. Only opaque hex colours transfer;
+ * `bgcolor` cannot express anything else.
+ */
+function mirrorBackgroundsToAttribute(root: HTMLElement): void {
+  for (const el of root.querySelectorAll<HTMLElement>('tr, td, th, table')) {
+    const colour = /background-color:\s*(#[0-9a-f]{3,8})/i.exec(el.getAttribute('style') ?? '')?.[1];
+    if (colour) el.setAttribute('bgcolor', colour);
+  }
+}
+
+/**
+ * Re-house each diagram figure in a table.
+ *
+ * Word applies padding and borders to `<div>` inconsistently and ignores
+ * `margin:0 auto` on images, so the centred, bordered card degrades into a
+ * left-aligned image with no frame. A single-cell table is the one container it
+ * lays out predictably.
+ */
+function wrapFiguresInTables(root: HTMLElement, cellStyle: string): void {
+  for (const figure of root.querySelectorAll<HTMLElement>(`[${FIGURE_MARKER}]`)) {
+    const doc = figure.ownerDocument;
+    const table = doc.createElement('table');
+    table.setAttribute('cellpadding', '0');
+    table.setAttribute('cellspacing', '0');
+    table.setAttribute('border', '0');
+    table.setAttribute('align', 'center');
+    mergeStyle(table, 'border-collapse:collapse;margin:22px auto;mso-table-lspace:0;mso-table-rspace:0');
+
+    const tbody = doc.createElement('tbody');
+    const tr = doc.createElement('tr');
+    const td = doc.createElement('td');
+    td.setAttribute('align', 'center');
+    mergeStyle(td, cellStyle);
+
+    while (figure.firstChild) td.appendChild(figure.firstChild);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+    figure.replaceWith(table);
   }
 }
 
@@ -132,12 +186,21 @@ function trimEdgeMargins(root: HTMLElement): void {
 export function prepareDocument(root: HTMLElement, profile: CopyTargetProfile): void {
   applyProfile(root, profile);
 
+  // Re-apply the figure style after the rule pass, then let the Outlook path
+  // consume the markers before they are cleared — the wrapper needs to find them.
   for (const figure of root.querySelectorAll(`[${FIGURE_MARKER}]`)) {
     mergeStyle(figure, profile.figure.style);
-    figure.removeAttribute(FIGURE_MARKER);
   }
 
-  if (profile.tableAttributes) applyTableAttributes(root);
+  if (profile.outlookCompat) {
+    wrapFiguresInTables(root, profile.figureCellStyle ?? '');
+  }
+
+  for (const figure of root.querySelectorAll(`[${FIGURE_MARKER}]`)) {
+    figure.removeAttribute(FIGURE_MARKER);
+  }
+  if (profile.tableAttributes) applyTableAttributes(root, profile.outlookCompat);
+  if (profile.outlookCompat) mirrorBackgroundsToAttribute(root);
   if (profile.structuralOnly) normalizeForConfluence(root);
 
   trimEdgeMargins(root);
@@ -155,6 +218,7 @@ export function styleDiagramFigure(
   img: HTMLImageElement,
   profile: CopyTargetProfile,
   intrinsicWidth: number,
+  intrinsicHeight = 0,
 ): HTMLElement {
   container.removeAttribute('style');
   container.setAttribute(FIGURE_MARKER, '');
@@ -163,6 +227,19 @@ export function styleDiagramFigure(
   const displayWidth = Math.max(1, Math.round(Math.min(profile.maxImageWidth, intrinsicWidth)));
   img.setAttribute('width', String(displayWidth));
   mergeStyle(img, 'max-width:100%;height:auto;border:0');
+
+  if (profile.outlookCompat) {
+    // Word ignores `max-width` and scales attribute-less images by the system
+    // DPI, so both dimensions have to be stated outright.
+    const ratio = intrinsicHeight > 0 && intrinsicWidth > 0 ? intrinsicHeight / intrinsicWidth : 0;
+    if (ratio > 0) {
+      const displayHeight = Math.max(1, Math.round(displayWidth * ratio));
+      img.setAttribute('height', String(displayHeight));
+      mergeStyle(img, `width:${displayWidth}px;height:${displayHeight}px`);
+    } else {
+      mergeStyle(img, `width:${displayWidth}px`);
+    }
+  }
 
   if (profile.figure.tag === 'div') return container;
 

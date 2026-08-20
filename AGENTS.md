@@ -106,6 +106,29 @@ Two things to preserve when touching it:
   foreignObject. A wider scan misclassifies node labels and draws a second
   border around them.
 
+### Outlook (lib/outlookCompat.ts)
+Outlook on Windows renders mail with **Word**, not a browser engine, and fails
+silently — no console, no error, just wrong output. Gmail can look perfect while
+Outlook is broken, so the email profile is written against Word's constraints and
+`outlookCompat.ts` lints the generated HTML for the traps that have actually bitten:
+
+- `mso-line-height-rule:exactly` is an **absolute** measure to Word. Pairing it
+  with a unitless `line-height:1.65` renders as ~1.65pt and collapses the text.
+  Every email line-height is therefore in px.
+- Word ignores `max-width` and scales attribute-less images by system DPI, so
+  images carry explicit `width` **and** `height`.
+- Borders and padding on `<div>` are unreliable; the diagram card is a
+  single-cell `<table>` (`figureCellStyle`) because Word lays tables out predictably.
+- CSS table widths get dropped and CSS backgrounds on rows/cells are patchy, so
+  both are mirrored onto `width` and `bgcolor` attributes.
+
+Run `pnpm test:outlook`. The lint is not a renderer: clean means none of the
+known traps are present, not that Word matches Gmail.
+
+**The one thing it cannot fix:** diagrams are `data:` URI images, and Outlook
+desktop does not resolve those when pasting HTML. That is a client limitation, not
+a markup bug — the audit reports it as a warning so it stays visible.
+
 ### Copy targets (lib/copyTargets.ts + lib/copyDocument.ts)
 "Copy preview" writes HTML styled for the system it will be pasted into, because every
 target strips CSS differently. All styling travels inline — there is no stylesheet on the

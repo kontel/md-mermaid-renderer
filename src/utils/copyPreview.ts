@@ -184,7 +184,7 @@ function replaceContainerWithImg(
 
   container.innerHTML = '';
   container.appendChild(img);
-  styleDiagramFigure(container, img, profile, png.width);
+  styleDiagramFigure(container, img, profile, png.width, png.height);
 }
 
 async function convertContainer(
