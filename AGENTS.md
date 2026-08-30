@@ -186,3 +186,16 @@ Deployed to GitHub Pages via GitHub Actions. Base path is `/md-mermaid-renderer/
 - React functional components with hooks
 - CSS in App.css (no CSS-in-JS)
 - Prefer type imports (`import type { X }`) for types only
+
+## Cursor Cloud specific instructions
+
+### Services
+
+This is a single client-side React SPA — no backend, no Docker, no external services. The only service to run is the Vite dev server (`pnpm dev`). All development commands are listed in the "Development Commands" section above.
+
+### Caveats
+
+- **esbuild build scripts**: pnpm's security feature blocks esbuild's postinstall by default. The `pnpm.onlyBuiltDependencies` field in `package.json` whitelists `esbuild` so `pnpm install` correctly installs its native binary. If this field is missing, run `pnpm install` then `pnpm rebuild esbuild` may not work — the field must be present before install.
+- **`pnpm typecheck` shows errors from `beautiful-mermaid`**: All typecheck failures come from the third-party `beautiful-mermaid` package in `node_modules`, not from project source. This is a known upstream issue.
+- **`pnpm lint` reports 1 error**: A pre-existing `react-refresh/only-export-components` warning in `src/context/MermaidContext.tsx`. Not introduced by agent changes.
+- **Dev server base path**: The app is served at `/md-mermaid-renderer/` (not root `/`), matching the GitHub Pages deployment config in `vite.config.ts`. Use `http://localhost:5173/md-mermaid-renderer/` when testing locally.
