@@ -6,7 +6,7 @@ import { HighlightedEditor } from './components/HighlightedEditor';
 import { MermaidProvider, useMermaidContext } from './context/MermaidContext';
 import type { MermaidRenderMode } from './context/MermaidContext';
 import { copyPreview } from './utils/copyPreview';
-import type { CopyImageFontSize, CopyStrategy, LabelWrapAggressiveness } from './utils/copyPreview';
+import type { CopyImageFontSize, CopyStrategy } from './utils/copyPreview';
 import { COPY_TARGETS, copyTargetProfile } from './lib/copyTargets';
 import type { CopyTarget } from './lib/copyTargets';
 import { TABS } from './content/samples';
@@ -114,8 +114,6 @@ function CopyPreviewButton({
   markdownSource: string;
 }) {
   const {
-    labelWrapAggressiveness,
-    setLabelWrapAggressiveness,
     copyImageFontSize,
     setCopyImageFontSize,
     copyTarget,
@@ -152,7 +150,6 @@ function CopyPreviewButton({
       await copyPreview(previewRef.current, {
         target: copyTarget,
         strategy,
-        wrapAggressiveness: labelWrapAggressiveness,
         copyImageFontSize,
         markdownSource,
       });
@@ -221,25 +218,12 @@ function CopyPreviewButton({
                 </select>
               </div>
               <div className="copy-popover-row">
-                <label htmlFor="copy-wrap">Label wrap</label>
-                <select
-                  id="copy-wrap"
-                  value={labelWrapAggressiveness}
-                  onChange={(e) => setLabelWrapAggressiveness(e.target.value as LabelWrapAggressiveness)}
-                  title="How aggressively long label text wraps in copied diagram images"
-                >
-                  <option value="compact">Compact</option>
-                  <option value="normal">Normal</option>
-                  <option value="wide">Wide</option>
-                </select>
-              </div>
-              <div className="copy-popover-row">
-                <label htmlFor="copy-font">Image font size</label>
+                <label htmlFor="copy-font">Diagram text</label>
                 <select
                   id="copy-font"
                   value={copyImageFontSize}
                   onChange={(e) => setCopyImageFontSize(e.target.value as CopyImageFontSize)}
-                  title="Font size of text in copied/saved diagram images"
+                  title="How large diagram labels read once pasted. Each image is sized from its diagram's own font."
                 >
                   <option value="small">Small</option>
                   <option value="normal">Normal</option>

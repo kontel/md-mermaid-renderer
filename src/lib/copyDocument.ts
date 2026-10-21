@@ -295,24 +295,97 @@ export function styleDiagramFigure(
   return retagged;
 }
 
-/**
- * Alt text for a diagram image, taken from the nearest preceding heading.
- *
- * Email clients that block images show this instead, so it is the only thing a
- * recipient may ever see of the diagram.
- */
-export function diagramAltText(container: Element, index: number): string {
+/** Nearest heading above `container` in document order, walking out of wrappers. */
+function precedingHeading(container: Element): string | null {
   let node: Element | null = container;
   while (node) {
     let sibling: Element | null = node.previousElementSibling;
     while (sibling) {
       if (/^H[1-6]$/.test(sibling.tagName)) {
         const heading = sibling.textContent?.trim();
-        if (heading) return `Diagram: ${heading}`;
+        if (heading) return heading;
       }
       sibling = sibling.previousElementSibling;
     }
     node = node.parentElement;
   }
-  return `Diagram ${index + 1}`;
+  return null;
+}
+
+/** mermaid's `aria-roledescription` values that don't read well when humanised. */
+const DIAGRAM_KIND_NAMES: Record<string, string> = {
+  'flowchart-v2': 'Flowchart',
+  flowchart: 'Flowchart',
+  er: 'Entity relationship diagram',
+  sequence: 'Sequence diagram',
+  class: 'Class diagram',
+  c4: 'C4 diagram',
+  xychart: 'XY chart',
+  railroadEbnf: 'Railroad diagram',
+};
+
+/** "quadrantChart" → "Quadrant chart". */
+function diagramKind(svg: Element | null): string {
+  const raw = svg?.getAttribute('aria-roledescription')?.trim();
+  if (!raw || raw === 'null') return 'Diagram';
+  if (DIAGRAM_KIND_NAMES[raw]) return DIAGRAM_KIND_NAMES[raw];
+  const words = raw.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]v\d+$/, '').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Longest alt text worth reading aloud; past this a screen reader user skips it. */
+const MAX_ALT_LENGTH = 240;
+
+/**
+ * A node's visible label. Text nodes are joined with spaces because a `<br>`
+ * contributes nothing to `textContent` ("working?<br>test" would read
+ * "working?test"). A class box contributes its name, not every member.
+ */
+function nodeLabel(node: Element): string {
+  const source = node.querySelector('.label-group') ?? node;
+  const walker = node.ownerDocument.createTreeWalker(source, NodeFilter.SHOW_TEXT);
+  const parts: string[] = [];
+  for (let text = walker.nextNode(); text; text = walker.nextNode()) parts.push(text.textContent ?? '');
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Alt text for a diagram image.
+ *
+ * An author's own `accTitle` / `accDescr` wins — mermaid writes them to the
+ * SVG's `<title>` and `<desc>`. Otherwise the alt names the kind of diagram,
+ * the section it sits in, and the first node labels, so it says what the
+ * diagram is about rather than only that one exists. Email clients that block
+ * images show this instead, so it may be all a recipient ever sees.
+ */
+export function diagramAltText(container: Element, index: number): string {
+  const svg = container.querySelector('svg');
+  const title = svg?.querySelector(':scope > title')?.textContent?.trim();
+  const desc = svg?.querySelector(':scope > desc')?.textContent?.trim();
+
+  let alt: string;
+  if (title || desc) {
+    alt = [title, desc].filter(Boolean).join('. ');
+  } else {
+    const heading = precedingHeading(container);
+    const kind = diagramKind(svg ?? null);
+    alt = heading ? `${kind}: ${heading}` : `${kind} ${index + 1}`;
+
+    const labels = [...new Set([...(svg?.querySelectorAll('g.node') ?? [])].map(nodeLabel).filter(Boolean))];
+    if (labels.length > 0) alt += ` — ${labels.join(', ')}`;
+  }
+
+  return alt.length > MAX_ALT_LENGTH ? `${alt.slice(0, MAX_ALT_LENGTH - 1).trimEnd()}…` : alt;
+}
+
+/** "Flowchart Example" → "flowchart-example.png"; the alt title when there is no heading. */
+export function diagramFileName(container: Element): string {
+  const title = container.querySelector('svg > title')?.textContent?.trim();
+  const base = (title || precedingHeading(container) || 'diagram')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return `${base || 'diagram'}.png`;
 }

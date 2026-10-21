@@ -19,8 +19,6 @@ const mockContext = {
   setThemeConfig: vi.fn(),
   isDrawerOpen: false,
   setDrawerOpen: vi.fn(),
-  labelWrapAggressiveness: 'normal' as const,
-  setLabelWrapAggressiveness: vi.fn(),
   copyImageFontSize: 'normal' as const,
   setCopyImageFontSize: vi.fn(),
 };

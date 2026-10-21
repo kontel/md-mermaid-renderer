@@ -2,9 +2,11 @@ import html2canvas from 'html2canvas';
 import { FLOWCHART_PADDING } from '../config/flowchart';
 import { copyTargetProfile } from '../lib/copyTargets';
 import type { CopyTarget, CopyTargetProfile } from '../lib/copyTargets';
-import { diagramAltText, prepareDocument, styleDiagramFigure } from '../lib/copyDocument';
+import { diagramAltText, diagramFileName, prepareDocument, styleDiagramFigure } from '../lib/copyDocument';
+import { COPY_IMAGE_TEXT_PX, planDiagramImage, typicalFontPx } from '../lib/diagramSizing';
+import type { CopyImageFontSize, DiagramImageLimits } from '../lib/diagramSizing';
 import { transformSvgForExport } from '../lib/svgExport';
-import type { LabelWrapAggressiveness } from '../lib/svgExport';
+import { diagramBackground, labelFontSizes, measureLabels } from './measureLabels';
 
 // Re-exported so callers keep importing label helpers from one place.
 export {
@@ -13,7 +15,7 @@ export {
   wrapSingleLineByWords,
   transformSvgForExport,
 } from '../lib/svgExport';
-export type { LabelWrapAggressiveness } from '../lib/svgExport';
+export type { CopyImageFontSize } from '../lib/diagramSizing';
 
 export type CopyStrategy = 'auto' | 'svg-pipeline' | 'dom-capture';
 
@@ -24,228 +26,137 @@ export interface DiagramPng {
   height: number;
 }
 
-/** Font size scale when copying/saving diagram images. */
-export type CopyImageFontSize = 'small' | 'normal' | 'large';
-
-const COPY_IMAGE_FONT_SCALE: Record<CopyImageFontSize, number> = {
-  small: 0.95,
-  normal: 1.15,
-  large: 1.30,
-};
-
-/** Base font size (px) for "normal" in exported diagram images; Small/Large scale this. */
-const COPY_IMAGE_BASE_FONT_PX = 14;
-
-/** Export width range (CSS pixels). Small diagrams scale down to min; large cap at max. Exported for tests. */
-export const MIN_PNG_WIDTH = 240;
-export const MAX_PNG_WIDTH = 600;
-/** Diagrams with intrinsic width above this are treated as "large" and allowed to grow past MAX_PNG_WIDTH. */
-export const LARGE_DIAGRAM_THRESHOLD = 1400;
-/** Hard cap for large/complex diagrams. Keeps PNGs manageable for clipboard/disk while staying legible. */
-export const ABSOLUTE_MAX_PNG_WIDTH = 6000;
-
-/**
- * Target export width from intrinsic diagram size.
- * - Tiny diagrams shrink toward MIN_PNG_WIDTH for tidy inline previews.
- * - Typical diagrams (up to ~1400px native) cap at MAX_PNG_WIDTH.
- * - Large/complex diagrams (e.g. wide grids, dense flows) scale up so labels stay readable,
- *   bounded by ABSOLUTE_MAX_PNG_WIDTH or the caller's tighter `maxRenderWidth`.
- */
-export function targetExportWidth(
-  intrinsicWidth: number,
-  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
-): number {
-  // A non-finite width would flow through to `canvas.width` and yield a blank
-  // PNG with no error anywhere, so it is worth catching here.
-  if (!Number.isFinite(intrinsicWidth) || intrinsicWidth <= 0) return MIN_PNG_WIDTH;
-
-  const rawCap = Number.isFinite(maxRenderWidth) && maxRenderWidth > 0
-    ? maxRenderWidth
-    : ABSOLUTE_MAX_PNG_WIDTH;
-  const cap = Math.min(ABSOLUTE_MAX_PNG_WIDTH, rawCap);
-
-  if (intrinsicWidth < 380) {
-    return Math.max(MIN_PNG_WIDTH, Math.round(intrinsicWidth * 0.72));
-  }
-  if (intrinsicWidth <= MAX_PNG_WIDTH) {
-    return Math.round(intrinsicWidth * 0.88);
-  }
-  if (intrinsicWidth <= LARGE_DIAGRAM_THRESHOLD) {
-    return MAX_PNG_WIDTH;
-  }
-  return Math.min(cap, Math.round(intrinsicWidth * 0.80));
+/** Limits for a standalone PNG (Copy/Save on one diagram): no page to fit into. */
+function standaloneLimits(fontSize: CopyImageFontSize): DiagramImageLimits {
+  return {
+    textPx: COPY_IMAGE_TEXT_PX[fontSize],
+    maxDisplayWidth: Number.POSITIVE_INFINITY,
+    maxRenderWidth: Number.POSITIVE_INFINITY,
+  };
 }
 
+function targetLimits(profile: CopyTargetProfile, fontSize: CopyImageFontSize): DiagramImageLimits {
+  return {
+    textPx: COPY_IMAGE_TEXT_PX[fontSize],
+    maxDisplayWidth: profile.maxImageWidth,
+    maxRenderWidth: profile.maxRenderWidth,
+  };
+}
 
-function svgToPng(
-  svgEl: SVGSVGElement,
-  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
-  fontSize: CopyImageFontSize = 'normal',
-  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
-): Promise<DiagramPng> {
-  const fontScale = COPY_IMAGE_FONT_SCALE[fontSize];
-  const serializer = new XMLSerializer();
-  let svgString = serializer.serializeToString(svgEl);
-
-  const bbox = svgEl.getBoundingClientRect();
-  // Prefer viewBox: bbox is clamped by the container's CSS width, so large diagrams look
-  // artificially small and get their labels crushed when exported.
-  const vbWidth = svgEl.viewBox?.baseVal?.width || 0;
-  const vbHeight = svgEl.viewBox?.baseVal?.height || 0;
-  const intrinsicWidth = vbWidth || bbox.width || 800;
-  const intrinsicHeight = vbHeight || bbox.height || 600;
-
-  const width = targetExportWidth(intrinsicWidth, maxRenderWidth);
-  const height = intrinsicHeight * (width / intrinsicWidth);
-
-  const normalizedFontPx = Math.round(COPY_IMAGE_BASE_FONT_PX * fontScale * 10) / 10;
-
-  svgString = transformSvgForExport(svgString, {
-    fontPx: normalizedFontPx,
-    wrapAggressiveness,
-  });
-
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-
-  const pad = FLOWCHART_PADDING;
-  const totalWidth = width + pad * 2;
-  const totalHeight = height + pad * 2;
-
-  return new Promise<DiagramPng>((resolve, reject) => {
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => {
-      try {
-        const scale = 2;
-        const canvas = document.createElement('canvas');
-        canvas.width = totalWidth * scale;
-        canvas.height = totalHeight * scale;
-
-        const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.scale(scale, scale);
-        ctx.drawImage(image, pad, pad, width, height);
-
-        resolve({ dataUri: canvas.toDataURL('image/png'), width: totalWidth, height: totalHeight });
-      } catch (err) {
-        reject(err);
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('SVG image load failed'));
-    };
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('SVG image load failed'));
     image.src = url;
   });
+}
+
+/**
+ * Rasterise a live diagram SVG.
+ *
+ * Labels are measured from the preview first so the PNG keeps mermaid's own
+ * wrapping and fonts; only then is a copy rewritten for the canvas.
+ */
+async function svgToPng(
+  svgEl: SVGSVGElement,
+  container: HTMLElement,
+  limits: DiagramImageLimits,
+): Promise<DiagramPng> {
+  const labels = measureLabels(svgEl);
+  const fontPx = typicalFontPx(labelFontSizes(svgEl, labels));
+
+  const viewBox = svgEl.viewBox.baseVal;
+  const bbox = svgEl.getBoundingClientRect();
+  // Prefer viewBox: the on-screen box is clamped by the pane, and a squeezed
+  // diagram would otherwise export at its squeezed size.
+  const width = viewBox?.width || bbox.width || 800;
+  const height = viewBox?.height || bbox.height || 600;
+  const pad = FLOWCHART_PADDING;
+  const plan = planDiagramImage({ width: width + pad * 2, height: height + pad * 2, fontPx }, limits);
+
+  // Give the copy an intrinsic size; `width="100%"` has nothing to resolve
+  // against inside an <img>.
+  const clone = svgEl.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute('width', String(width));
+  clone.setAttribute('height', String(height));
+  clone.style.removeProperty('max-width');
+
+  const svgString = transformSvgForExport(new XMLSerializer().serializeToString(clone), {
+    fontPx,
+    wrapAggressiveness: 'normal',
+    labels,
+  });
+
+  const url = URL.createObjectURL(new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const image = await loadImage(url);
+    const canvas = document.createElement('canvas');
+    canvas.width = plan.pixelWidth;
+    canvas.height = plan.pixelHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    ctx.fillStyle = diagramBackground(svgEl, container);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(plan.pixelRatio, plan.pixelRatio);
+    ctx.drawImage(image, pad, pad, width, height);
+    return { dataUri: canvas.toDataURL('image/png'), width: plan.displayWidth, height: plan.displayHeight };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Strategy 2: DOM capture via html2canvas (pixel-perfect, slower)
 // ---------------------------------------------------------------------------
 
-async function domToPng(
-  el: HTMLElement,
-  maxRenderWidth: number = ABSOLUTE_MAX_PNG_WIDTH,
-): Promise<DiagramPng> {
+async function domToPng(el: HTMLElement, limits: DiagramImageLimits): Promise<DiagramPng> {
   const rect = el.getBoundingClientRect();
-  const elWidth = rect.width || MAX_PNG_WIDTH;
-  const targetW = targetExportWidth(elWidth, maxRenderWidth);
-  const scale = (targetW / elWidth) * 2;
+  const width = rect.width || 600;
+  const height = rect.height || 400;
+  // The capture is of what is on screen, so the text size that matters is the on-screen one.
+  const svg = el.querySelector<SVGSVGElement>(':scope > svg');
+  const viewBoxWidth = svg?.viewBox.baseVal?.width ?? 0;
+  const onScreenScale = svg && viewBoxWidth ? svg.getBoundingClientRect().width / viewBoxWidth : 1;
+  const fontPx = svg
+    ? typicalFontPx(labelFontSizes(svg, measureLabels(svg))) * onScreenScale
+    : parseFloat(getComputedStyle(el).fontSize);
+  const plan = planDiagramImage({ width, height, fontPx }, limits);
 
   const canvas = await html2canvas(el, {
-    backgroundColor: '#ffffff',
-    scale,
+    backgroundColor: svg ? diagramBackground(svg, el) : '#ffffff',
+    scale: plan.pixelRatio,
     logging: false,
     useCORS: true,
   });
-  return {
-    dataUri: canvas.toDataURL('image/png'),
-    width: targetW,
-    height: Math.round(rect.height * (targetW / elWidth)),
-  };
+  return { dataUri: canvas.toDataURL('image/png'), width: plan.displayWidth, height: plan.displayHeight };
 }
 
-// ---------------------------------------------------------------------------
-// Container conversion — applies the chosen strategy per diagram
-// ---------------------------------------------------------------------------
-
-function replaceContainerWithImg(
+/** One diagram container → PNG, by the chosen strategy ("auto": SVG, then DOM). */
+async function diagramToPng(
   container: HTMLElement,
-  png: DiagramPng,
-  profile: CopyTargetProfile,
-  index: number,
-) {
+  limits: DiagramImageLimits,
+  strategy: CopyStrategy = 'auto',
+): Promise<DiagramPng> {
+  const svg = container.querySelector<SVGSVGElement>(':scope > svg');
+  if (strategy === 'dom-capture' || !svg) return domToPng(container, limits);
+  if (strategy === 'svg-pipeline') return svgToPng(svg, container, limits);
+  try {
+    return await svgToPng(svg, container, limits);
+  } catch {
+    // e.g. a canvas the browser still considers tainted — capture the DOM instead.
+    return domToPng(container, limits);
+  }
+}
+
+function replaceContainerWithImg(container: HTMLElement, png: DiagramPng, profile: CopyTargetProfile, alt: string) {
   const img = document.createElement('img');
   img.src = png.dataUri;
-  img.alt = diagramAltText(container, index);
+  img.alt = alt;
 
   container.innerHTML = '';
   container.appendChild(img);
   styleDiagramFigure(container, img, profile, png.width, png.height);
-}
-
-async function convertContainer(
-  liveContainer: HTMLElement,
-  cloneContainer: HTMLElement,
-  index: number,
-  profile: CopyTargetProfile,
-  strategy: CopyStrategy,
-  wrapAggressiveness: LabelWrapAggressiveness,
-  copyImageFontSize: CopyImageFontSize,
-) {
-  const liveSvg = liveContainer.querySelector<SVGSVGElement>(':scope > svg');
-  const renderCap = profile.maxRenderWidth;
-
-  if (strategy === 'dom-capture') {
-    const png = await domToPng(liveContainer, renderCap);
-    replaceContainerWithImg(cloneContainer, png, profile, index);
-    return;
-  }
-
-  if (strategy === 'svg-pipeline') {
-    if (!liveSvg) return;
-    const png = await svgToPng(liveSvg, wrapAggressiveness, copyImageFontSize, renderCap);
-    replaceContainerWithImg(cloneContainer, png, profile, index);
-    return;
-  }
-
-  // "auto": try SVG pipeline first, fall back to DOM capture
-  if (liveSvg) {
-    try {
-      const png = await svgToPng(liveSvg, wrapAggressiveness, copyImageFontSize, renderCap);
-      replaceContainerWithImg(cloneContainer, png, profile, index);
-      return;
-    } catch {
-      // SVG pipeline failed (likely foreignObject taint) — fall through
-    }
-  }
-
-  try {
-    const png = await domToPng(liveContainer, renderCap);
-    replaceContainerWithImg(cloneContainer, png, profile, index);
-  } catch {
-    // leave as-is on total failure
-  }
-}
-
-/** One diagram container → PNG data URI (SVG path then DOM fallback). */
-export async function diagramToPngDataUri(
-  container: HTMLElement,
-  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
-  copyImageFontSize: CopyImageFontSize = 'normal',
-): Promise<string> {
-  const svgEl = container.querySelector<SVGSVGElement>(':scope > svg');
-  if (svgEl) {
-    try {
-      return (await svgToPng(svgEl, wrapAggressiveness, copyImageFontSize)).dataUri;
-    } catch {
-      // fall through to DOM
-    }
-  }
-  return (await domToPng(container)).dataUri;
 }
 
 function dataUriToBlob(dataUri: string): Blob {
@@ -260,27 +171,26 @@ function dataUriToBlob(dataUri: string): Blob {
 /** Copy one diagram as PNG to clipboard. */
 export async function copyDiagramToClipboard(
   container: HTMLElement,
-  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
   copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness, copyImageFontSize);
-  const blob = dataUriToBlob(dataUri);
+  // Hand the clipboard a promise rather than a finished blob: Safari drops the
+  // user-gesture grant if the write starts only after a slow render.
+  const blob = diagramToPng(container, standaloneLimits(copyImageFontSize)).then((png) =>
+    dataUriToBlob(png.dataUri),
+  );
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 }
 
-/** Save one diagram as PNG file. */
+/** Save one diagram as a PNG named after its heading. */
 export async function saveDiagramAsFile(
   container: HTMLElement,
-  filename = 'diagram.png',
-  wrapAggressiveness: LabelWrapAggressiveness = 'normal',
   copyImageFontSize: CopyImageFontSize = 'normal',
 ): Promise<void> {
-  const dataUri = await diagramToPngDataUri(container, wrapAggressiveness, copyImageFontSize);
-  const blob = dataUriToBlob(dataUri);
-  const url = URL.createObjectURL(blob);
+  const png = await diagramToPng(container, standaloneLimits(copyImageFontSize));
+  const url = URL.createObjectURL(dataUriToBlob(png.dataUri));
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = diagramFileName(container);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -295,7 +205,6 @@ export interface CopyPreviewOptions {
   /** Target system the HTML is being styled for. Defaults to generic rich text. */
   target?: CopyTarget;
   strategy?: CopyStrategy;
-  wrapAggressiveness?: LabelWrapAggressiveness;
   copyImageFontSize?: CopyImageFontSize;
   /**
    * Markdown source behind the preview. Used verbatim as the `text/plain` flavor —
@@ -310,7 +219,6 @@ export async function buildTargetHtml(
   previewEl: HTMLElement,
   profile: CopyTargetProfile,
   strategy: CopyStrategy,
-  wrapAggressiveness: LabelWrapAggressiveness,
   copyImageFontSize: CopyImageFontSize,
 ): Promise<string> {
   const clone = previewEl.cloneNode(true) as HTMLElement;
@@ -318,17 +226,17 @@ export async function buildTargetHtml(
 
   const liveContainers = previewEl.querySelectorAll<HTMLElement>('.mermaid-container');
   const cloneContainers = clone.querySelectorAll<HTMLElement>('.mermaid-container');
+  const limits = targetLimits(profile, copyImageFontSize);
 
   for (let i = 0; i < liveContainers.length; i++) {
-    await convertContainer(
-      liveContainers[i],
-      cloneContainers[i],
-      i,
-      profile,
-      strategy,
-      wrapAggressiveness,
-      copyImageFontSize,
-    );
+    // Read before the SVG — with its title, description and labels — is replaced.
+    const alt = diagramAltText(cloneContainers[i], i);
+    try {
+      const png = await diagramToPng(liveContainers[i], limits, strategy);
+      replaceContainerWithImg(cloneContainers[i], png, profile, alt);
+    } catch {
+      // Leave this diagram as-is rather than lose the whole copy.
+    }
   }
 
   // Style the markdown root itself, not the scroll container: `innerHTML` would
@@ -346,7 +254,6 @@ export async function copyPreview(
   const {
     target = 'rich',
     strategy = 'auto',
-    wrapAggressiveness = 'normal',
     copyImageFontSize = 'normal',
     markdownSource,
   } = options;
@@ -361,7 +268,7 @@ export async function copyPreview(
     return;
   }
 
-  const html = await buildTargetHtml(previewEl, profile, strategy, wrapAggressiveness, copyImageFontSize);
+  const html = await buildTargetHtml(previewEl, profile, strategy, copyImageFontSize);
 
   await navigator.clipboard.write([
     new ClipboardItem({

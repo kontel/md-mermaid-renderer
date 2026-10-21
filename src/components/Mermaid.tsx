@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { flowchartConfig, HTML_LABELS } from '../config/flowchart';
 import { useMermaidContext } from '../context/MermaidContext';
+import { liftClusterLabels } from '../lib/clusterLabels';
 import { computeBeautifulRender } from '../lib/mermaidTheme';
 import { buildMermaidStyleConfig, styleConfigKey } from '../lib/mermaidStyle';
 import { DiagramActions } from './DiagramActions';
+
+/**
+ * Below this fit-to-width scale a 16px label shrinks under ~10px — the point
+ * where the preview stops being readable and an "actual size" view earns a button.
+ */
+const LEGIBLE_FIT_SCALE = 0.6;
 
 interface MermaidProps {
   chart: string;
@@ -105,6 +112,38 @@ export function Mermaid({ chart }: MermaidProps) {
   const svg = usesMermaidJs ? defaultSvg : beautiful.svg;
   const error = usesMermaidJs ? defaultError : beautiful.error;
 
+  // Before paint, so a title never flashes under an edge. React leaves the
+  // injected markup alone until `svg` changes, so the move survives re-renders.
+  useLayoutEffect(() => {
+    const svgEl = containerRef.current?.querySelector<SVGSVGElement>(':scope > svg');
+    if (svgEl && usesMermaidJs) liftClusterLabels(svgEl);
+  }, [svg, usesMermaidJs]);
+
+  const [fitScale, setFitScale] = useState(1);
+  const [actualSize, setActualSize] = useState(false);
+
+  // How far the pane squeezes the diagram, kept current as the split is dragged.
+  useEffect(() => {
+    const container = containerRef.current;
+    const naturalWidth = container?.querySelector<SVGSVGElement>(':scope > svg')?.viewBox.baseVal?.width;
+    if (!container || !naturalWidth) return;
+    container.style.setProperty('--diagram-width', `${naturalWidth}px`);
+    const measure = () => {
+      const style = getComputedStyle(container);
+      const inner = container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      setFitScale(Math.min(1, inner / naturalWidth));
+    };
+    // ResizeObserver only reports on a rendered frame, which a backgrounded tab
+    // never produces — measure once up front so the toggle does not wait for one.
+    queueMicrotask(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [svg]);
+
+  const canZoom = fitScale < LEGIBLE_FIT_SCALE;
+  const zoomed = canZoom && actualSize;
+
   if (error) {
     return (
       <div className="mermaid-error">
@@ -128,7 +167,11 @@ export function Mermaid({ chart }: MermaidProps) {
     <div className="mermaid-block">
       <div
         ref={containerRef as React.RefObject<HTMLDivElement | null>}
-        className="mermaid-container"
+        className={zoomed ? 'mermaid-container mermaid-container--actual' : 'mermaid-container'}
+        // Scrollable at actual size, so it must be reachable by keyboard.
+        tabIndex={zoomed ? 0 : undefined}
+        role={zoomed ? 'region' : undefined}
+        aria-label={zoomed ? 'Diagram at actual size, scrollable' : undefined}
         dangerouslySetInnerHTML={{ __html: svg }}
       />
       <div className="mermaid-block-footer">
@@ -137,7 +180,23 @@ export function Mermaid({ chart }: MermaidProps) {
             Rendered with mermaid.js
           </span>
         )}
-        <DiagramActions containerRef={containerRef} />
+        <DiagramActions containerRef={containerRef}>
+          {canZoom && (
+            <button
+              type="button"
+              className="diagram-actions-btn"
+              onClick={() => setActualSize((v) => !v)}
+              aria-pressed={zoomed}
+              title={
+                zoomed
+                  ? 'Shrink the diagram to fit the pane'
+                  : `Shown at ${Math.round(fitScale * 100)}% — view at actual size and scroll`
+              }
+            >
+              {zoomed ? 'Fit width' : `Actual size (${Math.round(fitScale * 100)}%)`}
+            </button>
+          )}
+        </DiagramActions>
       </div>
     </div>
   );

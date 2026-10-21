@@ -35,7 +35,7 @@ describe('DiagramActions', () => {
     render(<Wrapper containerRef={ref} />);
     const copyButtons = screen.getAllByRole('button', { name: 'Copy' });
     copyButtons[0].click();
-    expect(copyDiagramToClipboard).toHaveBeenCalledWith(ref.current, 'normal', 'normal');
+    expect(copyDiagramToClipboard).toHaveBeenCalledWith(ref.current, 'normal');
   });
 
   it('shows Copied! after copy', async () => {

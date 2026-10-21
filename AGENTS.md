@@ -39,9 +39,12 @@ src/
 │   ├── copyDocument.ts         # Applies a profile to a cloned DOM (jsdom-testable)
 │   ├── mermaidStyle.ts         # Diagram style presets + design tokens (pure, testable)
 │   ├── svgExport.ts            # foreignObject → SVG <text> rewrite for PNG export (pure string)
+│   ├── diagramSizing.ts        # Display size + PNG resolution from a diagram's own font (pure)
+│   ├── clusterLabels.ts        # Lifts subgraph titles above edges (live SVG)
 │   └── changelogStorage.ts     # "What's new" dismissal, per version
 ├── utils/
-│   └── copyPreview.ts           # Diagram PNG export + clipboard; exports pure helpers for tests
+│   ├── copyPreview.ts          # Diagram PNG export + clipboard; exports pure helpers for tests
+│   └── measureLabels.ts        # Reads label lines/fonts back from the live DOM (browser only)
 └── test/
     └── setup.ts                # Vitest + Testing Library setup
 ```
@@ -64,6 +67,19 @@ railroad) register their detectors lazily. The module awaits
 `registerExternalDiagrams([], { lazyLoad: true })` before the first render —
 without it, a page mounting several diagrams at once races registration and the
 losers report "No diagram type detected" until you navigate away and back.
+
+**mermaid 12 lays out with ELK by default** (flowchart, state, class, ER,
+requirement). The app follows that default; a diagram can opt back into dagre
+with `layout: dagre` in its front-matter `config`. Style presets always pass
+`theme` and `look` explicitly, so 12's new default theme (`redux-color` +
+`neo`) never leaks into `classic`.
+
+mermaid paints subgraphs — box and title — before edges, so with either layout
+an edge entering a subgraph from above strikes through its title.
+`liftClusterLabels` moves the titles into a layer after the edge paths, on a
+backing in the subgraph's fill, right after each render. A diagram squeezed below
+60% by the pane gets an "Actual size" toggle that shows it 1:1 in a scrollable,
+focusable region.
 
 When adding a sample diagram to `content/samples.ts`, render it before
 committing; several types are beta and their syntax is not always what the
@@ -97,7 +113,24 @@ line breaks, wrapping and centring by hand. It is pure string-in/string-out
 precisely so the regex work can be tested directly instead of only through a
 canvas.
 
-Two things to preserve when touching it:
+**Labels are measured, not guessed.** Before serialising, `measureLabels`
+reads every foreignObject's rendered lines (word ranges grouped by line), font
+and painted backgrounds from the live DOM, and the transform writes `<text>`
+from those. Re-wrapping by character count and forcing one font size is what made
+exported text overflow its shapes; that estimate is now only the fallback for a
+label that could not be measured (hidden, or under jsdom). Measured text and
+backgrounds are styled via `style=`, because mermaid's stylesheet (e.g.
+`.edgeLabel rect { opacity: .5 }`) beats presentation attributes.
+
+**Size follows the text.** `planDiagramImage` displays a diagram at the scale
+that puts its median label at the chosen "Diagram text" size (12/14/16px), shrunk
+only to fit the target's `maxImageWidth`. The PNG gets at least 2× that, or
+enough to read a shrunk diagram at 1:1, within `maxRenderWidth` × 2 and browser
+canvas limits (16384px a side, 16.7M px area — Safari's). Alt text uses the
+author's `accTitle`/`accDescr` when present, otherwise kind + heading + node
+labels.
+
+Three things to preserve when touching it:
 - **Faithfulness beats correctness.** mermaid mangles numeric character
   references in labels (`&#39;` reaches the DOM as `&'`). The export reproduces
   that rather than repairing it — a PNG that disagrees with the preview is worse
@@ -105,6 +138,8 @@ Two things to preserve when touching it:
 - The edge-label test only inspects a ±160 character window around each
   foreignObject. A wider scan misclassifies node labels and draws a second
   border around them.
+- The label-rect cleanup matches `label` as a whole class token. Block-diagram
+  nodes are classed `flowchart-label`; a substring match stripped their outlines.
 
 ### Outlook (lib/outlookCompat.ts)
 Outlook on Windows renders mail with **Word**, not a browser engine, and fails

@@ -268,3 +268,103 @@ describe('transformSvgForExport', () => {
     expect(out).not.toContain('NaN');
   });
 });
+
+describe('transformSvgForExport with measured labels', () => {
+  const measured = {
+    lines: [
+      { text: 'Debug with long text', cx: 100, cy: 12 },
+      { text: 'without line breaks', cx: 100, cy: 36 },
+    ],
+    fontPx: 16,
+    fontFamily: '"trebuchet ms", verdana, arial, sans-serif',
+    fontWeight: '400',
+    fontStyle: 'normal',
+    color: 'rgb(51, 51, 51)',
+    backgrounds: [],
+  };
+
+  it('keeps the browser’s own line breaks instead of re-wrapping', () => {
+    const out = transformSvgForExport(nodeLabel('Debug with long text without line breaks', { w: 200, h: 48 }), {
+      ...OPTS,
+      labels: [measured],
+    });
+    expect(textContentOf(out)).toBe('Debug with long text|without line breaks');
+  });
+
+  it('places each line at its measured centre, offset by the foreignObject origin', () => {
+    const out = transformSvgForExport(nodeLabel('x', { w: 200, h: 48 }), { ...OPTS, labels: [measured] });
+    // foreignObject sits at (10, 20); baseline is 0.35em below the line centre.
+    expect(out).toContain('<tspan x="110" y="37.6" text-anchor="middle">');
+    expect(out).toContain('<tspan x="110" y="61.6" text-anchor="middle">');
+  });
+
+  it('carries the measured font and colour in a style attribute that beats mermaid’s CSS', () => {
+    const out = transformSvgForExport(nodeLabel('x'), { ...OPTS, labels: [measured] });
+    expect(out).toContain('font-size:16px');
+    expect(out).toContain('fill:rgb(51, 51, 51)');
+    expect(out).toContain('font-family:&quot;trebuchet ms&quot;');
+  });
+
+  it('paints measured backgrounds instead of the estimated edge-label card', () => {
+    const out = transformSvgForExport(edgeLabel('Yes'), {
+      ...OPTS,
+      labels: [{ ...measured, lines: [{ text: 'Yes', cx: 40, cy: 12 }], backgrounds: [
+        { x: 0, y: 0, width: 80, height: 24, color: 'rgba(232, 232, 232, 0.8)' },
+      ] }],
+    });
+    expect(out).toContain('<rect class="label-bg" x="50" y="60" width="80" height="24" style="fill:rgba(232, 232, 232, 0.8);stroke:none;opacity:1"/>');
+    expect(out).not.toContain('#f6f8fa');
+  });
+
+  it('keeps the backing on an edge label nested the way mermaid 12 emits it', () => {
+    // g.edgeLabel > g.label: the inner group alone looks like a node label.
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><g class="edgeLabel"><g class="label" transform="translate(5, 5)">' +
+      '<foreignObject width="22" height="24"><div class="labelBkg"><span class="edgeLabel"><p>Yes</p></span></div></foreignObject>' +
+      '</g></g></svg>';
+    const out = transformSvgForExport(svg, {
+      ...OPTS,
+      labels: [{ ...measured, lines: [{ text: 'Yes', cx: 11, cy: 12 }], backgrounds: [
+        { x: 0, y: 0, width: 22, height: 24, color: 'rgba(232, 232, 232, 0.8)' },
+      ] }],
+    });
+    expect(out).toContain('class="label-bg"');
+  });
+
+  it('leaves native text sizes alone', () => {
+    const svg = `${nodeLabel('x').replace('</svg>', '')}<text font-size="12">axis</text></svg>`;
+    const out = transformSvgForExport(svg, { ...OPTS, labels: [measured] });
+    expect(out).toContain('font-size="12"');
+  });
+
+  it('falls back to the estimate for a label that could not be measured', () => {
+    const out = transformSvgForExport(nodeLabel('Start'), { ...OPTS, labels: [null] });
+    expect(textContentOf(out)).toBe('Start');
+    expect(out).toContain('font-family="arial, sans-serif"');
+  });
+
+  it('drops a label measured as empty', () => {
+    const out = transformSvgForExport(nodeLabel(''), { ...OPTS, labels: [{ ...measured, lines: [] }] });
+    expect(out).not.toContain('<text');
+  });
+
+  it('keeps the outline of a block-diagram node, whose class merely contains "label"', () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><g class="node default flowchart-label">' +
+      '<rect class="basic label-container" x="-75" y="-20" width="150" height="40"></rect>' +
+      '<g class="label"><rect></rect><foreignObject width="43" height="24"><div>Editor</div></foreignObject></g>' +
+      '</g></svg>';
+    const out = transformSvgForExport(svg, OPTS);
+    expect(out).toContain('class="basic label-container"');
+    expect(out).not.toContain('<rect></rect>');
+  });
+
+  it('keeps the subgraph title backing that hides edges behind the title', () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><g class="cluster-label">' +
+      '<rect class="cluster-label-bg" x="-4" y="0" width="60" height="24" style="fill:#ffffde"/>' +
+      '<foreignObject width="52" height="24"><div>Finish</div></foreignObject></g></svg>';
+    const out = transformSvgForExport(svg, { ...OPTS, labels: [{ ...measured, lines: [{ text: 'Finish', cx: 26, cy: 12 }] }] });
+    expect(out).toContain('cluster-label-bg');
+  });
+});

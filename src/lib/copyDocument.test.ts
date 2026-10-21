@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyProfile,
   diagramAltText,
+  diagramFileName,
   mergeStyle,
   parseStyleText,
   prepareDocument,
@@ -205,5 +206,65 @@ describe('diagramAltText', () => {
   it('falls back to a numbered label', () => {
     const root = bodyFrom('<div class="mermaid-container"></div>');
     expect(diagramAltText(root.querySelector('.mermaid-container')!, 2)).toBe('Diagram 3');
+  });
+});
+
+describe('diagramAltText from the diagram itself', () => {
+  const flowchart =
+    '<svg aria-roledescription="flowchart-v2"><g class="nodes">' +
+    '<g class="node"><foreignObject><div>Start</div></foreignObject></g>' +
+    '<g class="node"><foreignObject><div>Is it   working?</div></foreignObject></g>' +
+    '<g class="node"><foreignObject><div>Start</div></foreignObject></g>' +
+    '</g></svg>';
+
+  it('names the diagram kind and lists its nodes once each', () => {
+    const root = bodyFrom(`<h2>Flowchart Example</h2><div class="mermaid-container">${flowchart}</div>`);
+    expect(diagramAltText(root.querySelector('.mermaid-container')!, 0)).toBe(
+      'Flowchart: Flowchart Example — Start, Is it working?',
+    );
+  });
+
+  it('reads a line break as a space and a class box by its name', () => {
+    const svg =
+      '<svg aria-roledescription="class">' +
+      '<g class="node"><foreignObject><div>Is it working?<br>test</div></foreignObject></g>' +
+      '<g class="node"><g class="label-group">Mermaid</g><g class="members-group">+chart: string</g></g>' +
+      '</svg>';
+    const root = bodyFrom(`<div class="mermaid-container">${svg}</div>`);
+    expect(diagramAltText(root.querySelector('.mermaid-container')!, 0)).toBe(
+      'Class diagram 1 — Is it working? test, Mermaid',
+    );
+  });
+
+  it("prefers the author's accTitle and accDescr", () => {
+    const svg =
+      '<svg aria-roledescription="sequence"><title>Checkout</title><desc>Payment handshake</desc></svg>';
+    const root = bodyFrom(`<h2>Ignored</h2><div class="mermaid-container">${svg}</div>`);
+    expect(diagramAltText(root.querySelector('.mermaid-container')!, 0)).toBe('Checkout. Payment handshake');
+  });
+
+  it('humanises unfamiliar diagram kinds', () => {
+    const root = bodyFrom('<div class="mermaid-container"><svg aria-roledescription="quadrantChart"></svg></div>');
+    expect(diagramAltText(root.querySelector('.mermaid-container')!, 1)).toBe('Quadrant chart 2');
+  });
+
+  it('caps very long alt text', () => {
+    const nodes = Array.from({ length: 80 }, (_, i) => `<g class="node">Node number ${i}</g>`).join('');
+    const root = bodyFrom(`<div class="mermaid-container"><svg aria-roledescription="flowchart-v2">${nodes}</svg></div>`);
+    const alt = diagramAltText(root.querySelector('.mermaid-container')!, 0);
+    expect(alt.length).toBeLessThanOrEqual(240);
+    expect(alt.endsWith('…')).toBe(true);
+  });
+});
+
+describe('diagramFileName', () => {
+  it('slugs the nearest heading', () => {
+    const root = bodyFrom('<h2>Flowchart Example: v2!</h2><div class="mermaid-container"><svg></svg></div>');
+    expect(diagramFileName(root.querySelector('.mermaid-container')!)).toBe('flowchart-example-v2.png');
+  });
+
+  it('falls back to a generic name', () => {
+    const root = bodyFrom('<div class="mermaid-container"><svg></svg></div>');
+    expect(diagramFileName(root.querySelector('.mermaid-container')!)).toBe('diagram.png');
   });
 });

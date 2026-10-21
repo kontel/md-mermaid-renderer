@@ -137,23 +137,102 @@ export function autoWrapLinesByBoxWidth(
   return wrapped;
 }
 
+/** One rendered line of a label, positioned relative to its foreignObject. */
+export interface MeasuredLine {
+  text: string;
+  /** Centre of the line's ink, in the foreignObject's own units. */
+  cx: number;
+  cy: number;
+}
+
+/** A painted background inside a label (edge labels have one), same units. */
+export interface MeasuredBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+}
+
+/**
+ * A label exactly as the browser laid it out: its lines, font and backgrounds.
+ *
+ * Measured from the live preview, so the export reproduces mermaid's own
+ * wrapping instead of guessing it from character counts — the guess is what let
+ * exported text spill out of its shapes.
+ */
+export interface MeasuredLabel {
+  lines: MeasuredLine[];
+  fontPx: number;
+  fontFamily: string;
+  fontWeight: string;
+  fontStyle: string;
+  color: string;
+  backgrounds: MeasuredBox[];
+}
+
 export interface SvgExportOptions {
-  /** Uniform font size (px) applied to every label in the export. */
+  /** Font size (px) for labels that could not be measured. */
   fontPx: number;
   wrapAggressiveness: LabelWrapAggressiveness;
+  /**
+   * Measured layout per `<foreignObject>`, in document order. When present, the
+   * export is faithful: labels keep their own fonts and line breaks, and native
+   * `<text>` keeps its size. A null entry falls back to the estimate.
+   */
+  labels?: readonly (MeasuredLabel | null)[];
 }
 
 function attr(attrs: string, name: string): number {
   return parseFloat(new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1] || '0');
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * `<text>` for a measured label, placed in the foreignObject's coordinate space.
+ *
+ * Styles go in `style`, not presentation attributes: mermaid's own stylesheet
+ * has rules such as `.edgeLabel rect { opacity: .5 }` and `.label text { fill }`
+ * that beat attributes and would repaint the label in the theme default.
+ */
+function measuredLabelSvg(label: MeasuredLabel, x: number, y: number): string {
+  const backgrounds = label.backgrounds
+    .map(
+      (b) =>
+        `<rect class="label-bg" x="${round2(x + b.x)}" y="${round2(y + b.y)}" width="${round2(b.width)}" ` +
+        `height="${round2(b.height)}" style="${escapeXml(`fill:${b.color};stroke:none;opacity:1`)}"/>`,
+    )
+    .join('');
+
+  // 0.35em below the line's centre is where the baseline of a typical sans sits.
+  const baselineShift = label.fontPx * 0.35;
+  const tspans = label.lines
+    .map(
+      (line) =>
+        `<tspan x="${round2(x + line.cx)}" y="${round2(y + line.cy + baselineShift)}" text-anchor="middle">` +
+        `${escapeXml(line.text)}</tspan>`,
+    )
+    .join('');
+
+  const style =
+    `font-family:${label.fontFamily};font-size:${round2(label.fontPx)}px;` +
+    `font-weight:${label.fontWeight};font-style:${label.fontStyle};fill:${label.color};stroke:none`;
+
+  return `${backgrounds}<text style="${escapeXml(style)}">${tspans}</text>`;
+}
+
 /**
  * Swap `<foreignObject>` labels for `<text>`, strip the label backing rects that
- * would otherwise double up as borders, and normalise font sizes.
+ * would otherwise double up as borders, and — for unmeasured exports — normalise
+ * font sizes.
  */
 export function transformSvgForExport(svgString: string, options: SvgExportOptions): string {
-  const { fontPx, wrapAggressiveness } = options;
+  const { fontPx, wrapAggressiveness, labels } = options;
   let out = svgString;
+  let labelIndex = 0;
 
   if (!out.includes('xmlns=')) {
     out = out.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -166,6 +245,11 @@ export function transformSvgForExport(svgString: string, options: SvgExportOptio
       const y = attr(attrs, 'y');
       const w = attr(attrs, 'width');
       const h = attr(attrs, 'height');
+
+      const measured = labels?.[labelIndex++];
+      if (measured) {
+        return measured.lines.length > 0 ? measuredLabelSvg(measured, x, y) : '';
+      }
 
       // `<br>` becomes a newline before tags are stripped, so authored line
       // breaks survive; everything else collapses to plain text.
@@ -222,13 +306,25 @@ export function transformSvgForExport(svgString: string, options: SvgExportOptio
   );
 
   // Drop the node label backing rect that would show as a second border.
+  // `label` must be a whole class token: block-diagram nodes are classed
+  // `flowchart-label`, and a substring match stripped their outlines.
+  // Measured label backgrounds and the subgraph title backing (clusterLabels.ts)
+  // are deliberate and stay — mermaid nests edge labels as g.edgeLabel > g.label,
+  // so the class test alone would catch them too.
   out = out.replace(
-    /(<g[^>]*class="(?![^"]*edgeLabel)[^"]*\blabel\b[^"]*"[^>]*>)([\s\S]*?)(<\/g>)/gi,
+    /(<g[^>]*\bclass="(?![^"]*edgeLabel)(?:[^"]*\s)?label(?:\s[^"]*)?"[^>]*>)([\s\S]*?)(<\/g>)/gi,
     (_match, open: string, body: string, close: string) => {
-      const cleanedBody = body.replace(/<rect\b[^>]*\/>\s*|<rect\b[^>]*>\s*<\/rect>\s*/gi, '');
+      const cleanedBody = body.replace(
+        /<rect\b(?![^>]*\b(?:cluster-)?label-bg\b)[^>]*\/>\s*|<rect\b(?![^>]*\b(?:cluster-)?label-bg\b)[^>]*>\s*<\/rect>\s*/gi,
+        '',
+      );
       return `${open}${cleanedBody}${close}`;
     },
   );
+
+  // A measured export already carries each label's real size; flattening native
+  // `<text>` too would shrink sequence and chart text that never needed it.
+  if (labels) return out;
 
   // One size for node labels, edge labels and subgraph titles alike. Matches the
   // attribute form only; CSS `font-size:` inside <style> is left alone.

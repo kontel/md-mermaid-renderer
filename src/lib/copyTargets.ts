@@ -113,7 +113,7 @@ const RICH: CopyTargetProfile = {
   ],
   zebraStripe: 'background-color:#f6f8fa',
   maxImageWidth: 760,
-  // Matches ABSOLUTE_MAX_PNG_WIDTH: documents can carry the detail.
+  // Documents can carry the detail; canvas limits bind before this does.
   maxRenderWidth: 6000,
   figure: {
     tag: 'div',

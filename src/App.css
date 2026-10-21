@@ -236,6 +236,9 @@
   .diagram-actions,
   .mermaid-fallback-note { display: none; }
   .mermaid-container { break-inside: avoid; }
+  /* Paper cannot scroll: always print the whole diagram. */
+  .mermaid-container--actual { max-height: none; }
+  .mermaid-container--actual svg { width: auto; max-width: 100% !important; }
   .code-block { break-inside: avoid; }
 }
 
@@ -1000,6 +1003,30 @@
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+/*
+ * Actual size: the diagram at its natural width, scrolled inside its card.
+ * Start-aligned, because a centred flex child that overflows is cut off on the
+ * left where no scrollbar can reach — and not stretched, or the capped card
+ * height squeezes the SVG and its viewBox scales the drawing right back down.
+ * `!important` beats the inline max-width mermaid writes on every SVG.
+ */
+.mermaid-container--actual {
+  justify-content: flex-start;
+  align-items: flex-start;
+  max-height: 80vh;
+}
+
+.mermaid-container--actual svg {
+  width: var(--diagram-width);
+  max-width: none !important;
+  flex: none;
+}
+
+.mermaid-container--actual:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .mermaid-block-footer {
